@@ -1,0 +1,25 @@
+{extend name='../../admin/view/table'}
+
+{block name="content"}
+<div class="layui-tab layui-tab-card table-block">
+    <div class="layui-tab-content table-content">
+        {include file='market/depth_search'}
+        <table id="RawTradesTable" data-url="{:sysuri('depth_trades')}?source_key={$sourceKey}" data-target-search="form.form-search"></table>
+    </div>
+</div>
+
+<script>
+    $(function () {
+        $('#RawTradesTable').layTable({
+            even: true, height: 'full', page: false,
+            text: { none: '暂无数据（该行情源尚未采集到成交，或采集进程未运行）' },
+            cols: [[
+                { field: 'ts_text', title: '时间', width: 180, align: 'center' },
+                { field: 'direction_text', title: '方向', width: 100, align: 'center', templet: function (d) { return '<span class="' + d.direction_color + '">' + d.direction_text + '</span>'; } },
+                { field: 'price', title: '价格', width: 180, align: 'right', templet: function (d) { return '<span class="' + d.direction_color + '">' + d.price + '</span>'; } },
+                { field: 'quantity', title: '数量', width: 180, align: 'right' }
+            ]]
+        });
+    });
+</script>
+{/block}

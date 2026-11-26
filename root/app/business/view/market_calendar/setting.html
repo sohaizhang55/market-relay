@@ -1,0 +1,136 @@
+{extend name="../../admin/view/main"}
+
+{block name="content"}
+<div class="think-box-shadow">
+    <form action="{:sysuri()}" method="post" data-auto="true" class="layui-form layui-card">
+        <div class="layui-card-body padding-left-40 padding-right-40">
+
+            <div class="layui-form-item margin-bottom-20">
+                <div class="help-label"><b>休市流程</b>Market Session</div>
+                <div class="layui-row layui-col-space15">
+                    <div class="layui-col-xs4">
+                        <select class="layui-select" name="market_session_enabled" required vali-name="休市流程">
+                            {foreach $statuses as $k=>$v}
+                            <option value="{$k}" {if $gate eq $k}selected{/if}>{$v}</option>
+                            {/foreach}
+                        </select>
+                    </div>
+                </div>
+                <div class="help-block">
+                    <b>启用</b>：到了休市时间，系统知道这是休市，不会误报「价格停更」，也不会反复去交易所要数据；
+                    交易日历随 pair 元数据下发，订阅方据此判断能不能交易。<br>
+                    <b>停用</b>：<b>完全回到没有这个功能的状态</b>，系统不再看交易日历。<br>
+                    改完最长 10 秒生效，<b>不需要重启任何进程</b>。
+                </div>
+            </div>
+
+            <div class="layui-form-item margin-bottom-20">
+                <div class="help-label"><b>停用会带来什么</b></div>
+                <div class="help-block">
+                    休市时间照样能下单、机器人照常挂单 —— 这是你想要的。<br>
+                    但<b>休市期间会重新刷出「行情价格异常」告警</b>：休市时价格本来就不更新，
+                    而系统不再看日历，也就分不清这是关门还是故障了。美股周末两天可能有几千条。<br><br>
+                    这是有意的：停用多半是因为<b>日历判错了</b>，这时再让它继续屏蔽告警，
+                    等于「因为不信它才关掉，却还用它挡住警报」—— 那段时间行情真坏了没人知道。
+                </div>
+            </div>
+
+            <div class="layui-form-item margin-bottom-20">
+                <div class="help-label"><b>这个开关管不到单条规则</b></div>
+                <div class="help-block">
+                    要单独停用某一条，去「节假日休市」或「开市时段」两页改，粒度更细。<br>
+                    <b>注意两者方向相反</b>：停用一条<b>开市时段</b>，那段时间就变成休市；
+                    停用一条<b>节假日</b>，那天反而照常开市。
+                </div>
+            </div>
+
+            <div class="layui-form-item text-center">
+                <button class="layui-btn" type="submit">保存配置</button>
+            </div>
+
+        </div>
+    </form>
+</div>
+
+<div class="think-box-shadow margin-top-20">
+    <div class="layui-card-body padding-left-40 padding-right-40">
+
+        <div class="layui-form-item margin-bottom-20">
+            <div class="help-label">
+                <b>休市判定巡检</b>
+                <span class="layui-badge {$audit.level}">{$audit.title}</span>
+                <span class="color-desc margin-left-5">{$audit.ago}</span>
+            </div>
+            <div class="help-block">
+                盯的是<b>反方向</b>：按日历判休市、但行情还在持续更新 —— 多半是日历配错、时区错或假日数据过期，
+                后果是这些 pair 被订阅方当成休市。<br>
+                正方向（判开市却收不到数据）由「行情价格过期检查」负责，两个方向合起来才算把日历盯住。
+                {notempty name="$audit.detail"}
+                <div class="margin-top-10">
+                    {foreach $audit.detail as $line}
+                    <div class="color-red">· {$line}</div>
+                    {/foreach}
+                </div>
+                {/notempty}
+            </div>
+        </div>
+
+        <div class="layui-form-item margin-bottom-20">
+            <div class="help-label"><b>当前各市场状态</b>刷新页面即为最新</div>
+            <div class="help-block">
+                只列出<b>真有行情源跟随</b>的日历。24/7 的加密标的没有休市这回事，不在这里。<br>
+                {if !$gateOn}
+                <span class="color-red">休市流程已停用，下面只是「按日历此刻判什么」，<b>不影响实际能否下单</b>。</span>
+                {/if}
+            </div>
+        </div>
+
+        {if empty($lives)}
+        <div class="help-block padding-bottom-20">
+            还没有任何行情源配置日历（<code>market_data.calendar_code</code> 全为空），因此不存在休市判定。
+        </div>
+        {else}
+        <div class="layui-row layui-col-space15 margin-bottom-15">
+            {foreach $lives as $v}
+            <div class="layui-col-md4 layui-col-sm6">
+                <div class="layui-card" style="border:1px solid #eee;height:100%">
+
+                    <div class="layui-card-header" style="border-bottom:1px solid #f2f2f2">
+                        <span style="font-size:15px"><b>{$v.label}</b></span>
+                        <span class="layui-badge {$v.state_badge}" style="float:right;margin-top:12px">{$v.state_text}</span>
+                    </div>
+
+                    <div class="layui-card-body">
+                        <div class="margin-bottom-10">
+                            <span class="layui-badge-rim">{$v.code}</span>
+                            <span class="color-desc margin-left-5">{$v.timezone}</span>
+                        </div>
+
+                        <div class="margin-bottom-10">
+                            <span class="color-desc">当地时间</span>
+                            <span style="font-size:20px;letter-spacing:1px"><b>{$v.local_time}</b></span>
+                        </div>
+
+                        <div>
+                            <span class="color-desc">跟随 {$v.source_count} 个行情源</span><br>
+                            {foreach $v.sources as $sk}<code style="display:inline-block;margin:4px 6px 0 0;font-size:12px">{$sk}</code>{/foreach}
+                            {if $v.source_more gt 0}<span class="color-desc">另 {$v.source_more} 个</span>{/if}
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            {/foreach}
+        </div>
+        <div class="help-block padding-bottom-20">
+            <span class="layui-badge layui-bg-green">开市</span> 可以交易
+            <span class="layui-badge layui-bg-gray">休市</span> 计划内休市，不是故障
+            <span class="layui-badge layui-bg-red">配置无效</span> <code>calendar_code</code>
+            填了系统不认识的值<br>
+            标<b>配置无效</b>的标的一律判休市、下不了单，需要交易请先建好对应日历再替换。
+        </div>
+        {/if}
+
+    </div>
+</div>
+{/block}

@@ -1,0 +1,153 @@
+/* �ڱ�ϵͳȫ����ʽ */
+.f2c-badge-red {
+    background-color: #ff5722 !important;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    line-height: 18px;
+    text-align: center;
+}
+
+.f2c-dropdown {
+    position: absolute;
+    top: 60px;
+    right: 0;
+    width: 340px;
+    background: #fff;
+    border: 1px solid #e2e2e2;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .1);
+    display: none;
+    z-index: 1000;
+}
+
+.f2c-dropdown.active {
+    display: block;
+    animation: layui-upbit .3s;
+}
+
+.f2c-dd-head {
+    padding: 10px 15px;
+    border-bottom: 1px solid #f6f6f6;
+    background: #fafafa;
+    font-weight: bold;
+    color: #333;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.f2c-dd-content {
+    max-height: 380px;
+    overflow-y: auto;
+}
+
+
+.f2c-dd-item {
+    display: flex;
+    align-items: flex-start;
+    padding: 12px 15px;
+    border-bottom: 1px solid #f6f6f6;
+    transition: background .2s;
+    text-decoration: none;
+    position: relative;
+    cursor: pointer;
+}
+
+.f2c-dd-item:hover {
+    background: #fcfcfc;
+}
+
+
+.f2c-item-dot-wrap {
+    width: 14px;
+    flex-shrink: 0;
+    margin-top: 4px;
+    text-align: left;
+}
+
+.f2c-item-dot {
+    display: none;
+    width: 6px;
+    height: 6px;
+    background: #ff5722;
+    border-radius: 50%;
+}
+
+.f2c-dd-item.unread .f2c-item-dot {
+    display: inline-block;
+}
+
+.f2c-item-body {
+    flex-grow: 1;
+    width: 0;
+}
+
+.f2c-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 3px;
+}
+
+.f2c-item-header .item-title {
+    font-size: 14px;
+    color: #333;
+    font-weight: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 10px;
+}
+
+.f2c-item-header .item-tag {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: #fff;
+    line-height: 1.2;
+    opacity: 0.9;
+    flex-shrink: 0;
+}
+
+/* ��ϢժҪ�������±߾� */
+.f2c-item-content {
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ʱ�� */
+.f2c-item-time {
+    font-size: 12px;
+    color: #bbb;
+    display: flex;
+    align-items: center;
+}
+
+.f2c-item-time i {
+    font-size: 12px;
+    margin-right: 4px;
+}
+
+/* ���� */
+.f2c-dd-empty {
+    padding: 40px 15px;
+    text-align: center;
+    color: #ccc;
+}
+
+.f2c-dd-foot {
+    padding: 10px;
+    text-align: center;
+    background: #fff;
+    border-top: 1px solid #f6f6f6;
+}
+
+.f2c-dd-foot a {
+    color: #1e9fff;
+    font-size: 13px;
+}

@@ -1,0 +1,25 @@
+<fieldset>
+    <legend>条件搜索</legend>
+    <form class="layui-form layui-form-pane form-search" action="{:sysuri()}" onsubmit="return false" method="get" autocomplete="off">
+        <div class="layui-form-item layui-inline">
+            <label class="layui-form-label">内部编码</label>
+            <div class="layui-input-inline">
+                <input name="source_key" value="{$get.source_key|default=''}" placeholder="请输入内部编码" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item layui-inline">
+            <label class="layui-form-label">周期</label>
+            <div class="layui-input-inline">
+                <select name="period" class="layui-select">
+                    <option value="">-- 全部周期 --</option>
+                    {foreach $periods as $k=>$v}
+                    <option value="{$k}" {if isset($get.period) && $get.period == $k}selected{/if}>{$v}</option>
+                    {/foreach}
+                </select>
+            </div>
+        </div>
+        <div class="layui-form-item layui-inline">
+            <button class="layui-btn layui-btn-primary"><i class="layui-icon">&#xe615;</i> 搜 索</button>
+        </div>
+    </form>
+</fieldset>

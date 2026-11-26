@@ -1,0 +1,8 @@
+# shell 脚本在 Linux 上执行，必须是 LF。
+# Windows 上 core.autocrlf=true 会把它检出成 CRLF，bash 执行时报 "$'\r': command not found"
+*.sh text eol=lf
+# deploy/install.sh、deploy/firewall.sh 会 source 端口文件，CRLF 会让每个端口值带上 \r
+deploy/ports.env text eol=lf
+
+# Go 分发机 Linux 二进制：禁止任何换行转换，否则 autocrlf 会改坏文件
+go/market_dispatch_go binary

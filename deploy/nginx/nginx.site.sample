@@ -1,0 +1,47 @@
+log_format web_market_relay_log '$remote_addr - $remote_user [$time_local] "$request" '
+    '$status $body_bytes_sent $request_time $http_user_agent';    
+
+server {
+    listen 80;
+    server_name 127.0.0.1;  
+    deny all;
+}  
+ 
+server {
+    listen 8091;
+    listen 23343; 
+    listen 32343; 
+    server_name 127.0.0.1;  
+    include /home/deploy/market-relay/deploy/nginx/nginx.site.common; 
+}  
+ 
+server {
+    listen 80;
+    server_name @SERVER_NAME_1@;  # SERVER_NAME_1
+    #rewrite ^(.*)$  https://$host$1 redirect;    
+    include /home/deploy/market-relay/deploy/nginx/nginx.site.common; 
+}
+server {
+    listen 80;
+    server_name @SERVER_NAME_2@;   # SERVER_NAME_2
+    #rewrite ^(.*)$  https://$host$1 redirect;   
+    include /home/deploy/market-relay/deploy/nginx/nginx.site.common; 
+}
+server {
+    listen 80;
+    server_name @SERVER_NAME_3@;  # SERVER_NAME_3
+    #rewrite ^(.*)$  https://$host$1 redirect;    
+    include /home/deploy/market-relay/deploy/nginx/nginx.site.common; 
+}
+server {
+    listen 80;
+    server_name @SERVER_NAME_4@;  # SERVER_NAME_4
+    #rewrite ^(.*)$  https://$host$1 redirect;    
+    include /home/deploy/market-relay/deploy/nginx/nginx.site.common; 
+}
+server {
+    listen 80;
+    server_name @SERVER_NAME_5@;  # SERVER_NAME_5
+    #rewrite ^(.*)$  https://$host$1 redirect;    
+    include /home/deploy/market-relay/deploy/nginx/nginx.site.common; 
+}

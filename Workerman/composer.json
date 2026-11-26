@@ -1,0 +1,14 @@
+{
+    "name": "workerman/root-workerman",
+    "require": {
+        "workerman/workerman": "^5.1",
+        "workerman/gateway-worker": "^3.0",
+        "monolog/monolog": "^3.0"
+    },
+    "repositories": {
+        "packagist": {
+            "type": "composer",
+            "url": "http://mirrors.aliyun.com/composer/"
+        }
+    }
+}

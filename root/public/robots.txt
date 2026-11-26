@@ -1,0 +1,21 @@
+User-agent: *
+
+# 允许抓取首页和公开内容
+Allow: /
+Allow: /static/
+Allow: /upload/
+Allow: /h5/
+
+# 禁止抓取后台管理目录 (如果你用了 appmap 映射，请填写映射后的名字)
+Disallow: /admin/
+
+# 禁止抓取框架逻辑和插件目录
+Disallow: /think/
+Disallow: /vendor/
+Disallow: /runtime/
+
+# 禁止抓取敏感操作页面
+Disallow: /index.php/admin/
+Disallow: /login/
+Disallow: /register/
+Disallow: /error/

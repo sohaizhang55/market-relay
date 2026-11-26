@@ -1,0 +1,70 @@
+<form action="{:sysuri()}" method="post" data-auto="true" class="layui-form layui-card" data-table-id="PairSourceTable">
+    <div class="layui-card-body padding-left-40">
+
+        <fieldset class="layui-bg-gray">
+            <legend><b class="layui-badge think-bg-violet">{$pairKey|default=''} {:lang('数据源')}</b></legend>
+
+            <div class="layui-row layui-col-space15">
+                <div class="layui-col-xs12">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('数据源')}</b>Source</span>
+                        {if $isEdit}
+                        <div class="layui-input layui-bg-gray">{$vo.source_key|default=''}</div>
+                        <span class="help-block">{:lang('绑定的源建立后不能改，要换源请删掉这条再新建。')}</span>
+                        {else}
+                        <select name="source_key" class="layui-select" lay-search required vali-name="{:lang('数据源')}">
+                            <option value="">-- {:lang('请选择')} --</option>
+                            {foreach $sources as $key=>$text}
+                            <option value="{$key}">{$text}</option>
+                            {/foreach}
+                        </select>
+                        <span class="help-block">{:lang('只列出还没绑定的源；交易对已有绑定时，只列与已有源同类型（现货 / 合约）的源。')}</span>
+                        {/if}
+                    </label>
+                </div>
+            </div>
+
+            <div class="layui-row layui-col-space15 margin-top-10">
+                <div class="layui-col-xs6">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('优先级')}</b>Priority</span>
+                        <input name="priority" value='{$vo.priority|default="1"}' required vali-name="{:lang('优先级')}"
+                            type="number" min="1" max="999" class="layui-input">
+                        <span class="help-block">{:lang('越小越优先，第一个启用的是主源。同一交易对内不能重复。')}</span>
+                    </label>
+                </div>
+                <div class="layui-col-xs6">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('状态')}</b>Status</span>
+                        <select name="status" class="layui-select" required vali-name="{:lang('状态')}">
+                            {foreach $statuses as $k=>$v}
+                            <option value="{$k}" {if ($vo.status ?? "") eq $k}selected{/if}>{$v}</option>
+                            {/foreach}
+                        </select>
+                        <span class="help-block">{:lang('停用的源不参与选源；当前在用的源不能停用。')}</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="layui-row layui-col-space15 margin-top-10">
+                <div class="layui-col-xs12">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('备注')}</b>Remark</span>
+                        <input name="remark" value='{$vo.remark|default=""}' placeholder="{:lang('选填')}" class="layui-input">
+                    </label>
+                </div>
+            </div>
+
+        </fieldset>
+
+    </div>
+
+    <div class="hr-line-dashed"></div>
+    <input type='hidden' value='{$vo.pair_id|default=""}' name='pair_id'>
+    {notempty name='vo.id'}<input type='hidden' value='{$vo.id}' name='id'>{/notempty}
+
+    <div class="layui-form-item text-center">
+        <button class="layui-btn" type='submit'>{:lang('保存数据')}</button>
+        <button class="layui-btn layui-btn-danger" type='button' data-confirm="{:lang('确定要取消编辑吗？')}" data-close>{:lang('取消编辑')}</button>
+    </div>
+</form>

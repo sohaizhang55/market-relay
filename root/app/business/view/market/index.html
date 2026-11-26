@@ -1,0 +1,129 @@
+{extend name='../../admin/view/table'}
+
+{block name="content"}
+<div class="layui-tab layui-tab-card">
+    <div class="layui-tab-content">
+        {include file='market/index_search'}
+        <table id="MarketDataTable" data-url="{:sysuri('index')}" data-target-search="form.form-search"></table>
+    </div>
+</div>
+
+<script>
+    $(function () {
+        $('#MarketDataTable').layTable({
+            even: true, height: 'full',
+            sort: { field: 'id', type: 'asc' },
+            cols: [[
+                { field: 'id', title: 'ID', width: 70, align: 'center', sort: true },
+                {
+                    field: 'exchange', title: '交易所', width: 130, align: 'center',
+                    templet: function (d) {
+                        var colors = { huobi: 'layui-bg-orange', binance: 'layui-bg-blue', okx: 'layui-bg-green', coingecko: 'layui-bg-gray' };
+                        return '<span class="layui-badge ' + (colors[d.exchange] || '') + '">' + (d.exchange_text || d.exchange) + '</span>';
+                    }
+                },
+                { field: 'symbol', title: '币种代码', minWidth: 120, align: 'center', templet: '<div><b>{{d.symbol}}</b></div>' },
+                {
+                    field: 'type', title: '类型', width: 90, align: 'center',
+                    templet: function (d) {
+                        return d.type == 1
+                            ? '<span class="layui-badge layui-bg-green">现货</span>'
+                            : '<span class="layui-badge layui-bg-blue">合约</span>';
+                    }
+                },
+                { field: 'category_code', title: '产品类型', width: 100, align: 'center', templet: function (d) { return d.category_text || d.category_code || '-'; } },
+                {
+                    field: 'calendar_code', title: '交易日历', width: 110, align: 'center',
+                    templet: function (d) {
+                        return '<span class="layui-badge ' + d.calendar_code_color
+                            + '" title="' + d.calendar_code_title + '">' + d.calendar_code_text + '</span>';
+                    }
+                },
+                {
+                    field: 'session', title: '当前状态', width: 100, align: 'center',
+                    templet: function (d) {
+                        // 24/7 的源没有 badge 颜色，退化成灰字，不跟真有休市的行抢注意力
+                        return d.session_badge
+                            ? '<span class="layui-badge ' + d.session_badge + '" title="' + d.session_title + '">' + d.session_text + '</span>'
+                            : '<span class="color-desc" title="' + d.session_title + '">' + d.session_text + '</span>';
+                    }
+                },
+                /* WS 新鲜度：最后一帧价格 / 深度是几秒前收到的。超过该源的断流阈值标红，主备切换就是按这两列判断流的 */
+                { field: 'price_fresh_text', title: '价格新鲜度', width: 100, align: 'center', templet: '<div><span class="{{d.price_fresh_color}}" title="{{d.price_fresh_title}}">{{d.price_fresh_text}}</span> <span class="color-desc">/ {{d.ticker_stale_sec}}s</span></div>' },
+                { field: 'depth_fresh_text', title: '深度新鲜度', width: 100, align: 'center', templet: '<div><span class="{{d.depth_fresh_color}}" title="{{d.depth_fresh_title}}">{{d.depth_fresh_text}}</span> <span class="color-desc">/ {{d.depth_stale_sec}}s</span></div>' },
+                /* 近 10 分钟帧间隔统计（选源进程落的）：最长间隔 / 超阈值次数，调断流秒数时对着看 */
+                { field: 'price_stat_text', title: '价格近10分钟', width: 110, align: 'center', templet: '<div><span class="{{d.price_stat_color}}" title="{{d.price_stat_title}}">{{d.price_stat_text}}</span></div>' },
+                { field: 'depth_stat_text', title: '深度近10分钟', width: 110, align: 'center', templet: '<div><span class="{{d.depth_stat_color}}" title="{{d.depth_stat_title}}">{{d.depth_stat_text}}</span></div>' },
+                {
+                    field: 'close', title: '最新价', minWidth: 120, align: 'right',
+                    templet: function (d) {
+                        var p = parseFloat(d.close);
+                        if (!p) return '<span class="color-desc">-</span>';
+                        return '<b class="color-green">' + (p >= 1 ? p.toFixed(4) : p.toFixed(8)) + '</b>';
+                    }
+                },
+                { field: 'update_ts_text', title: '最后行情价格', width: 170, align: 'center' },
+                {
+                    field: 'mark_price', title: '标记价格', minWidth: 120, align: 'right',
+                    templet: function (d) {
+                        var p = parseFloat(d.mark_price);
+                        if (d.type == 1 || !p) return '<span class="color-desc">-</span>';
+                        return '<b class="color-blue" title="' + (d.mark_ts_text || '-') + '">' + (p >= 1 ? p.toFixed(4) : p.toFixed(8)) + '</b>';
+                    }
+                },
+                { field: 'mark_ts_text', title: '最后标记价格', width: 170, align: 'center' },
+                {
+                    /* 资金费率：仅合约有。当期为主、预估作小字附在下方，避免多占一列。
+                       正费率=多头付空头(对多头不利)标红，负费率=空头付多头标绿，与交易所惯例一致 */
+                    field: 'funding_rate', title: '资金费率', minWidth: 130, align: 'right',
+                    templet: function (d) {
+                        if (d.type == 1 || !d.funding_rate_ts || d.funding_rate_ts == 0) return '<span class="color-desc">-</span>';
+                        var r = parseFloat(d.funding_rate) * 100;
+                        var e = parseFloat(d.estimated_funding_rate) * 100;
+                        var cls = r > 0 ? 'color-red' : (r < 0 ? 'color-green' : 'color-desc');
+                        var html = '<b class="' + cls + '" title="采集于 ' + (d.funding_rate_ts_text || '-') + '">' + (r > 0 ? '+' : '') + r.toFixed(4) + '%</b>';
+                        html += '<div class="color-desc" style="font-size:12px">预估 ' + (e > 0 ? '+' : '') + e.toFixed(4) + '%</div>';
+                        return html;
+                    }
+                },
+                {
+                    /* 费率采集时间。超过 1 小时未更新即标红——下游资金费结算前会校验新鲜度，
+                       陈旧就整期跳过收费，这里标红等于提前暴露"采集通道断了" */
+                    field: 'funding_rate_ts_text', title: '最后资金费率', width: 170, align: 'center',
+                    templet: function (d) {
+                        if (d.type == 1 || d.funding_rate_ts_text === '-') return '<span class="color-desc">-</span>';
+                        return d.funding_stale
+                            ? '<span class="color-red" title="超过 1 小时未更新，结算时会被判定为过期而跳过">' + d.funding_rate_ts_text + ' ⚠</span>'
+                            : d.funding_rate_ts_text;
+                    }
+                },
+                {
+                    /* 交易所自报的下次结算时间，仅记录备用；本平台结算窗口走 exchange_contract.next_funding_ts */
+                    field: 'exchange_next_funding_ts_text', title: '交易所下次结算', width: 170, align: 'center',
+                    templet: function (d) {
+                        if (d.type == 1 || d.exchange_next_funding_ts_text === '-') return '<span class="color-desc">-</span>';
+                        return '<span class="color-desc">' + d.exchange_next_funding_ts_text + '</span>';
+                    }
+                },
+                { field: 'high', title: '24h 最高', minWidth: 110, align: 'right' },
+                { field: 'low',  title: '24h 最低', minWidth: 110, align: 'right' },
+                {
+                    field: 'vol', title: '24h 量', minWidth: 110, align: 'right',
+                    templet: function (d) { return parseFloat(d.vol).toLocaleString(); }
+                },
+                { field: 'source_key', title: '来源标识', minWidth: 180 },
+                { toolbar: '#toolbar', title: '操作', align: 'center', width: 380, fixed: 'right' }
+            ]]
+        });
+    });
+</script>
+
+<script type="text/html" id="toolbar">
+    <a class="layui-btn layui-btn-sm layui-btn-warm" data-open='{:url("source_kline_preview")}?source_key={{d.source_key}}' data-title="K线预览[{{d.source_key}}]" data-full="true">K线预览</a>
+    <a class="layui-btn layui-btn-sm layui-btn-normal" data-open='{:url("depth")}?source_key={{d.source_key}}' data-title="原始盘口深度[{{d.source_key}}]" data-full="true">盘口深度</a>
+    <a class="layui-btn layui-btn-sm layui-btn-normal" data-open='{:url("depth_trades")}?source_key={{d.source_key}}' data-title="原始成交流水[{{d.source_key}}]" data-full="true">成交流水</a>
+    {if auth("stale_edit")}
+    <a class="layui-btn layui-btn-sm layui-btn-primary" data-modal='{:url("stale_edit")}?id={{d.id}}' data-title="断流阈值[{{d.source_key}}]">断流阈值</a>
+    {/if}
+</script>
+{/block}

@@ -1,0 +1,272 @@
+{extend name="../../admin/view/main"}
+
+{block name="content"}
+<style>
+    .dg-body { max-width: 1100px; }
+    .dg-body h3 { font-size: 15px; font-weight: bold; margin: 22px 0 10px; }
+    .dg-body pre { background: #f6f8fa; border: 1px solid #eee; border-radius: 4px; padding: 10px 12px; font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; margin: 0; }
+    .dg-body code { background: #f2f2f2; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+    .dg-body ol { padding-left: 20px; line-height: 1.9; }
+    .dg-body ol li { list-style: decimal; }
+    .dg-symbols { max-height: 180px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; padding: 6px 8px; }
+    .dg-symbols label, .dg-streams label { display: inline-block; min-width: 120px; margin: 2px 6px 2px 0; cursor: pointer; font-size: 13px; }
+    .dg-symbols input, .dg-streams input { vertical-align: middle; margin-right: 3px; }
+    .dg-row { margin-bottom: 10px; }
+    .dg-row > b { display: inline-block; width: 80px; vertical-align: top; }
+    .dg-row > .dg-ctl { display: inline-block; width: calc(100% - 90px); }
+</style>
+
+<div class="layui-card">
+    <div class="layui-card-header">
+        分发对接说明
+        <span class="color-desc font-s12">给订阅方（下游业务服务器）看的。端口、心跳、降级等数值读自本机代码与配置</span>
+    </div>
+    <div class="layui-card-body dg-body">
+
+        <h3>1. 连接地址</h3>
+        <table class="layui-table" lay-size="sm">
+            <thead><tr><th>通道</th><th>地址</th><th>说明</th></tr></thead>
+            <tbody>
+            {foreach $endpoints as $ep}
+            <tr>
+                <td>WebSocket {$ep.label}</td>
+                <td><code>{$ep.url}</code></td>
+                <td>只推{$ep.label}交易对（当前启用 {$ep.pair_count} 个），stream 里只写裸 symbol</td>
+            </tr>
+            {/foreach}
+            <tr>
+                <td>HTTP</td>
+                <td><code>/inner_api/pair/*</code></td>
+                <td>经 Nginx 对外端口访问；请求头 <code>X-Inner-Token</code> 填本订阅方自己的 token（后台「订阅方管理」发放，向运维索取），与 WS 握手用同一个</td>
+            </tr>
+            </tbody>
+        </table>
+        <div class="color-desc font-s12">
+            地址里的主机取自当前后台域名；如果后台走了反代或域名与分发机不同，换成分发机的实际 IP。
+            IP 白名单（同时作用于 HTTP 和两个 WS 端口，不在名单里会被直接断开、收不到原因）：{$allowIpsText}
+        </div>
+
+        <h3>2. 对接流程</h3>
+        <ol>
+            <li>握手请求头带 <code>X-Inner-Token: &lt;本订阅方 token&gt;</code>：分发鉴权开启后不带或带错，握手直接回 HTTP 403，连接建不起来；未开启时可不带，但带上才能在后台看到你的最后连接 IP</li>
+            <li>连上对应端口（现货 / 合约各一个），连上后<b>先发 hello</b>（文本帧），不发一帧都收不到</li>
+            <li>hello 通过后，分发机先按订阅<b>补发一次当前快照</b>，之后某个 stream 一有变化就推一条</li>
+            <li>行情是<b>二进制帧</b>：一条消息 = 一帧，内容是 raw deflate 压缩的 JSON，第一个字段是 <code>stream</code></li>
+            <li><b>文本帧</b>都是系统帧（<code>_sys</code> 开头）：收到 ping 要回 pong，否则会被断开（超时见第 6 节）</li>
+            <li>断线后重连、重新发 hello 即可：覆盖语义下补一次快照就是最新状态，不需要补中间的历史</li>
+            <li>想改订阅就再发一次 hello，<b>整个替换</b>旧订阅（不是增量），并重新补快照</li>
+        </ol>
+
+        <h3>3. hello 生成器</h3>
+        <div class="layui-form">
+            <div class="dg-row">
+                <b>端口</b>
+                <div class="dg-ctl" id="dg-type"></div>
+            </div>
+            <div class="dg-row">
+                <b>节点名</b>
+                <div class="dg-ctl"><input id="dg-node" class="layui-input" style="width:260px;display:inline-block" placeholder="本机标识，监控页按它分组" value="server-b"></div>
+            </div>
+            <div class="dg-row">
+                <b>交易对</b>
+                <div class="dg-ctl">
+                    <div class="margin-bottom-5">
+                        <a class="layui-btn layui-btn-xs layui-btn-primary" id="dg-sym-all">全选</a>
+                        <a class="layui-btn layui-btn-xs layui-btn-primary" id="dg-sym-none">清空</a>
+                        <span class="color-desc font-s12">一个都不选 = 不带 streams，订阅本端口全部</span>
+                    </div>
+                    <div class="dg-symbols" id="dg-symbols"></div>
+                </div>
+            </div>
+            <div class="dg-row">
+                <b>stream</b>
+                <div class="dg-ctl">
+                    <div class="dg-streams" id="dg-streams"></div>
+                    <div class="margin-top-5 font-s13">
+                        depth 间隔：
+                        <select id="dg-depth-iv" lay-ignore style="height:26px">
+                            {foreach $depthIntervals as $iv}<option value="{$iv}">{$iv}ms</option>{/foreach}
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="dg-row">
+                <b>结果</b>
+                <div class="dg-ctl">
+                    <pre id="dg-out"></pre>
+                    <div class="margin-top-5">
+                        <a class="layui-btn layui-btn-sm" id="dg-copy">复制 hello</a>
+                        <span class="color-desc font-s12" id="dg-meta"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h3>4. stream 字典</h3>
+        <table class="layui-table" lay-size="sm">
+            <thead><tr><th style="width:190px">stream</th><th style="width:170px">帧里的 _channel</th><th>内容</th></tr></thead>
+            <tbody>
+            {foreach $streamRows as $row}
+            <tr><td><code>{$row.stream}</code></td><td><code>{$row.channel}</code></td><td>{$row.desc}</td></tr>
+            {/foreach}
+            </tbody>
+        </table>
+        <div class="font-s13">
+            K 线周期：{foreach $klineIntervals as $sec => $iv}<code>kline_{$iv}</code>（{$sec} 秒） {/foreach}<br>
+            depth 间隔：{foreach $depthIntervals as $iv}<code>@{$iv}ms</code> {/foreach}，不写默认第一档；只有 depth 能带间隔<br>
+            symbol 不区分大小写，<code>BTC-USDT</code>、<code>btc_usdt</code> 都会归一成 <code>btcusdt</code>
+        </div>
+
+        <h3>5. 消息格式</h3>
+        <div class="font-s13 margin-bottom-5">行情帧（二进制，解压后）：每帧都带 <code>stream</code>、<code>pair</code>、<code>symbol</code>、<code>type</code>、<code>_channel</code>，所有 ts 都是毫秒</div>
+{literal}
+<pre>{"stream":"btcusdt@ticker","pair":"btcusdt_2","symbol":"btcusdt","type":2,"tick":{"last_price":"79660.2","open":"78010.5","high":"80122.0","low":"77650.1","close":"79660.2","amount":"...","vol":"...","change":"2.11"},"ts":1793092651234,"_channel":"market:raw:price"}</pre>
+{/literal}
+        <table class="layui-table" lay-size="sm">
+            <thead><tr><th style="width:110px">系统帧 _sys</th><th style="width:140px">方向</th><th>说明</th></tr></thead>
+            <tbody>
+            {foreach $sysFrames as $name => $sf}
+            <tr><td><code>{$name}</code></td><td>{$sf[0]}</td><td>{$sf[1]}</td></tr>
+            {/foreach}
+            </tbody>
+        </table>
+
+        <h3>6. 规则</h3>
+        <table class="layui-table" lay-size="sm">
+            <tbody>
+            {foreach $rules as $rule}
+            <tr><td style="width:110px"><b>{$rule[0]}</b></td><td>{$rule[1]}</td></tr>
+            {/foreach}
+            </tbody>
+        </table>
+
+        <h3>7. HTTP 接口</h3>
+        <table class="layui-table" lay-size="sm">
+            <thead><tr><th style="width:240px">接口（GET）</th><th>用途</th></tr></thead>
+            <tbody>
+            {foreach $httpApis as $path => $desc}
+            <tr><td><code>{$path}</code></td><td>{$desc}</td></tr>
+            {/foreach}
+            </tbody>
+        </table>
+        <div class="color-desc font-s12">成功 <code>{"code":1,"msg":"success","data":...}</code>，失败 <code>{"code":0,"msg":"..."}</code>，鉴权失败 HTTP 403。字段说明见 market-relay 代码 app/inner_api/controller/Pair.php 的注释（向对接负责人索取）。</div>
+
+        <h3>8. 收数示例</h3>
+        <div class="font-s13 margin-bottom-5">JavaScript（Node，npm install ws pako；浏览器的 WebSocket 设不了请求头，不能用）</div>
+{literal}
+<pre>const WebSocket = require('ws'), pako = require('pako');
+const ws = new WebSocket('ws://&lt;分发机IP&gt;:{/literal}{$exampleSwapPort}{literal}', { headers: { 'X-Inner-Token': '&lt;token&gt;' } });
+ws.binaryType = 'arraybuffer';
+ws.onopen = () => ws.send(JSON.stringify({ cmd: 'hello', node: 'server-b', streams: ['btcusdt@ticker', 'btcusdt@depth@500ms'] }));
+ws.onmessage = (ev) => {
+  if (typeof ev.data === 'string') {                       // 文本帧 = 系统帧
+    const m = JSON.parse(ev.data);
+    if (m._sys === 'ping') ws.send(JSON.stringify({ _sys: 'pong', ts: m.ts }));
+    else console.log('sys', m);                            // error / throttle
+    return;
+  }
+  const frame = JSON.parse(pako.inflateRaw(new Uint8Array(ev.data), { to: 'string' }));
+  console.log(frame.stream, frame);                        // 按 frame.stream 分发处理
+};</pre>
+{/literal}
+        <div class="font-s13 margin-top-10 margin-bottom-5">Python（pip install websockets）</div>
+{literal}
+<pre>import asyncio, json, zlib, websockets
+
+async def main():
+    async with websockets.connect("ws://&lt;分发机IP&gt;:{/literal}{$exampleSwapPort}{literal}", max_size=None,
+                                  additional_headers={"X-Inner-Token": "&lt;token&gt;"}) as ws:
+        await ws.send(json.dumps({"cmd": "hello", "node": "server-b", "streams": ["btcusdt@ticker"]}))
+        async for msg in ws:
+            if isinstance(msg, str):                        # 文本帧 = 系统帧
+                m = json.loads(msg)
+                if m.get("_sys") == "ping":
+                    await ws.send(json.dumps({"_sys": "pong", "ts": m["ts"]}, separators=(",", ":")))
+                else:
+                    print("sys", m)
+                continue
+            frame = json.loads(zlib.decompress(msg, -15))   # raw deflate
+            print(frame["stream"], frame)
+
+asyncio.run(main())</pre>
+{/literal}
+        <div class="color-desc font-s12 margin-top-10">用 Postman / PieSocket 这类工具手连也可以：地址要写全 <code>ws://</code>，发 hello 后能看到系统帧，行情帧是二进制（显示为乱码属正常），并且要每 30 秒左右手动发一次 <code>{"_sys":"pong","ts":0}</code>。</div>
+    </div>
+</div>
+
+<script>
+    window.DG_PAIRS = {:json_encode($pairs, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP)};
+</script>
+{literal}
+<script>
+(function () {
+    var data = window.DG_PAIRS || {};
+    var types = Object.keys(data);
+    var cur = types.length ? types[types.length - 1] : null;   // 默认合约
+
+    function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+    function renderType() {
+        $('#dg-type').html(types.map(function (t) {
+            return '<label style="margin-right:16px;cursor:pointer"><input type="radio" name="dg-type" value="' + t + '"' + (t === cur ? ' checked' : '')
+                + ' lay-ignore> ' + esc(data[t].label) + ' <code>' + esc(data[t].url) + '</code></label>';
+        }).join(''));
+    }
+
+    function renderLists() {
+        var d = data[cur] || { symbols: [], streams: [] };
+        $('#dg-symbols').html(d.symbols.length ? d.symbols.map(function (s, i) {
+            return '<label title="' + esc(s.name) + '"><input type="checkbox" class="dg-sym" value="' + esc(s.code) + '"' + (i < 3 ? ' checked' : '') + ' lay-ignore>' + esc(s.code) + '</label>';
+        }).join('') : '<span class="color-desc">没有启用的交易对</span>');
+        $('#dg-streams').html(d.streams.map(function (n) {
+            var on = n === 'ticker' || n === 'depth';
+            return '<label><input type="checkbox" class="dg-st" value="' + esc(n) + '"' + (on ? ' checked' : '') + ' lay-ignore>' + esc(n) + '</label>';
+        }).join(''));
+    }
+
+    function build() {
+        var node = $.trim($('#dg-node').val());
+        var hello = { cmd: 'hello' };
+        if (node) hello.node = node;
+        var syms = $('.dg-sym:checked').map(function () { return this.value; }).get();
+        var sts = $('.dg-st:checked').map(function () { return this.value; }).get();
+        var iv = $('#dg-depth-iv').val();
+        var first = $('#dg-depth-iv option:first').val();
+        if (syms.length) {
+            var list = [];
+            syms.forEach(function (s) {
+                sts.forEach(function (n) { list.push(s + '@' + n + (n === 'depth' && iv !== first ? '@' + iv + 'ms' : '')); });
+            });
+            hello.streams = list;
+            $('#dg-meta').text(list.length + ' 个 stream · ' + JSON.stringify(hello).length + ' 字节');
+        } else {
+            $('#dg-meta').text('不带 streams：订阅本端口全部 stream');
+        }
+        $('#dg-out').text(JSON.stringify(hello));
+    }
+
+    function copy(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+            return navigator.clipboard.writeText(text).then(function () { layer.msg('已复制'); });
+        }
+        // 后台多半是 http，clipboard API 不可用，退回 execCommand
+        var ta = $('<textarea style="position:fixed;left:-9999px">').val(text).appendTo('body');
+        ta[0].select();
+        try { document.execCommand('copy'); layer.msg('已复制'); } catch (e) { layer.msg('复制失败，请手动选中'); }
+        ta.remove();
+    }
+
+    $(document).on('change', 'input[name=dg-type]', function () { cur = this.value; renderLists(); build(); });
+    $(document).on('change', '.dg-sym, .dg-st, #dg-depth-iv', build);
+    $(document).on('input', '#dg-node', build);
+    $('#dg-sym-all').on('click', function () { $('.dg-sym').prop('checked', true); build(); });
+    $('#dg-sym-none').on('click', function () { $('.dg-sym').prop('checked', false); build(); });
+    $('#dg-copy').on('click', function () { copy($('#dg-out').text()); });
+
+    renderType();
+    renderLists();
+    build();
+})();
+</script>
+{/literal}
+{/block}

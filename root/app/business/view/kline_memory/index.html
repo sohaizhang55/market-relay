@@ -1,0 +1,40 @@
+{extend name='../../admin/view/table'}
+
+{block name="content"}
+<div class="layui-tab layui-tab-card">
+    <div class="layui-tab-content">
+        <blockquote class="layui-elem-quote layui-text font-s12">
+            market:kline_backfill 向交易所要过、交易所确实没给的 K 线段（维护停机、休市、上市前、火币现货早于最近 2000 根），记下后 7 天内不再问。
+            图表某段一直缺而交易所其实有数据时，删掉对应记录，最多 5 分钟内会重新去问。
+        </blockquote>
+
+        {include file='kline_memory/index_search'}
+
+        <table id="KlineMemoryTable" data-url="{:sysuri('index')}" data-target-search="form.form-search"></table>
+    </div>
+</div>
+
+<script>
+    $(function () {
+        $('#KlineMemoryTable').layTable({
+            even: true, height: 'full',
+            cols: [[
+                { field: 'source_key', title: '内部编码', minWidth: 220, align: 'center' },
+                { field: 'period_text', title: '周期', width: 100, align: 'center' },
+                { field: 'start_text', title: '起点', width: 160, align: 'center' },
+                { field: 'end_text', title: '终点', width: 160, align: 'center' },
+                { field: 'candles', title: '根数', width: 90, align: 'center' },
+                { field: 'marked_text', title: '记录时间', width: 170, align: 'center' },
+                { field: 'expire_text', title: '过期时间', width: 170, align: 'center' },
+                { toolbar: '#toolbar', title: '操作面板', align: 'center', width: 120, fixed: 'right' }
+            ]]
+        });
+    });
+</script>
+<script type="text/html" id="toolbar">
+    <!--{if auth("remove")}-->
+    <a class="layui-btn layui-btn-sm layui-btn-danger" data-confirm="删除后补数进程会重新去问交易所这一段，确定吗？" data-action="{:url('remove')}"
+       data-value="source_key#{{d.source_key}};period#{{d.period}};start_ts#{{d.start_ts}}">重新确认</a>
+    <!--{/if}-->
+</script>
+{/block}

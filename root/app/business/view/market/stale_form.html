@@ -1,0 +1,51 @@
+<form action="{:sysuri()}" method="post" data-auto="true" class="layui-form layui-card" data-table-id="MarketDataTable">
+    <div class="layui-card-body padding-left-40">
+
+        <fieldset class="layui-bg-gray">
+            <legend><b class="layui-badge think-bg-violet">{:lang('断流阈值')}</b></legend>
+
+            <div class="layui-row layui-col-space15">
+                <div class="layui-col-xs12">
+                    <span class="help-label"><b>{:lang('行情源')}</b>Source</span>
+                    <div class="layui-input layui-bg-gray">{$vo.source_key|default=''}</div>
+                </div>
+            </div>
+
+            <div class="layui-row layui-col-space15 margin-top-10">
+                <div class="layui-col-xs6">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('ticker 断流秒数')}</b>Ticker</span>
+                        <input name="ticker_stale_sec" value='{$vo.ticker_stale_sec|default="30"}' required vali-name="{:lang('ticker 断流秒数')}"
+                            type="number" min="0" max="3600" class="layui-input">
+                        <span class="help-block">{:lang('超过这么久没收到 WS 价格帧，判该源不健康。0 = 不判。')}</span>
+                    </label>
+                </div>
+                <div class="layui-col-xs6">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('深度断流秒数')}</b>Depth</span>
+                        <input name="depth_stale_sec" value='{$vo.depth_stale_sec|default="15"}' required vali-name="{:lang('深度断流秒数')}"
+                            type="number" min="0" max="3600" class="layui-input">
+                        <span class="help-block">{:lang('超过这么久没收到 WS 深度帧，判该源不健康。0 = 不判。')}</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 价格帧安静不一定是故障：有的交易所只在价格变化时才推 ticker，冷门币可能很久不推 -->
+            <blockquote class="layui-elem-quote layui-quote-nm margin-top-15">
+                {:lang('主备切换据此判断该源（交易所 × 币种）是否健康。只看该源自己的 WS 帧，REST 兜底刷的价格不算。')}
+                <br>
+                {:lang('火币等交易所只在价格变化时才推 ticker，行情安静时价格帧可能长时间不来；误判多就把 ticker 秒数调大。')}
+            </blockquote>
+
+        </fieldset>
+
+    </div>
+
+    <div class="hr-line-dashed"></div>
+    {notempty name='vo.id'}<input type='hidden' value='{$vo.id}' name='id'>{/notempty}
+
+    <div class="layui-form-item text-center">
+        <button class="layui-btn" type='submit'>{:lang('保存数据')}</button>
+        <button class="layui-btn layui-btn-danger" type='button' data-confirm="{:lang('确定要取消编辑吗？')}" data-close>{:lang('取消编辑')}</button>
+    </div>
+</form>

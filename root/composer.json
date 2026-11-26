@@ -1,0 +1,35 @@
+{
+  "type": "project",
+  "name": "zoujingli/thinkadmin",
+  "license": "MIT",
+  "homepage": "https://thinkadmin.top",
+  "description": "Application Development Framework",
+  "keywords": [
+    "ThinkAdmin",
+    "ThinkLibrary",
+    "WeChatDeveloper"
+  ],
+  "authors": [
+    {
+      "name": "Anyon",
+      "email": "zoujingli@qq.com"
+    }
+  ],
+  "config": {
+    "allow-plugins": {
+      "zoujingli/think-install": true
+    }
+  },
+  "require": {
+    "php": ">=7.1",
+    "topthink/think-orm": "^2.0|^3.0",
+    "zoujingli/think-plugs-admin": "^1.0",
+    "phpmailer/phpmailer": "^6.9"
+  },
+  "repositories": {
+    "packagist": {
+      "type": "composer",
+      "url": "https://mirrors.aliyun.com/composer/"
+    }
+  }
+}

@@ -1,0 +1,210 @@
+{extend name="../../admin/view/main"}
+
+{block name="content"}
+<style>
+    .gdm-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); align-items: stretch; }
+    .gdm-grid .layui-card { margin: 0; }
+    .gdm-grid .layui-table { margin: 0; }
+    .gdm-kind { display: inline-block; margin-right: 10px; white-space: nowrap; }
+    .gdm-conns td { vertical-align: top; }
+    .gdm-conns .layui-progress { margin-top: 4px; width: 140px; }
+</style>
+<div class="layui-card">
+    <div class="layui-card-header">
+        Go 分发监控
+        <span class="color-desc font-s12">
+            并行试跑的 Go 分发机（仓库 go/ 目录）· 每 {$refresh} 秒自动刷新 · 连接明细每 10 秒由分发机更新一次 · 只读 Redis
+        </span>
+        <div class="pull-right"><span id="gdm-updated" class="color-desc font-s12"></span></div>
+    </div>
+    <div class="layui-card-body">
+
+        <div id="gdm-alerts" class="margin-bottom-15"></div>
+
+        <fieldset class="layui-elem-field layui-field-title">
+            <legend>分发进程 <span class="color-desc font-s12">计数是最近 10 秒；PHP 分发机见「分发监控」</span></legend>
+        </fieldset>
+        <div id="gdm-procs" class="gdm-grid"></div>
+
+        <fieldset class="layui-elem-field layui-field-title">
+            <legend>订阅方连接 <span id="gdm-conn-count" class="color-desc font-s12"></span></legend>
+        </fieldset>
+        <div class="color-desc font-s12 margin-bottom-5">
+            有问题的排前面。Go 不降级：订阅方收得慢时，depth / ticker / markPrice 在待发表里只留最新一帧，旧帧被「合并」掉不发；
+            trade / kline 排队，待发表超过上限或单次写阻塞超过 lag_close 秒就断开。待发表取最近 10 秒的峰值，发出不含补快照。
+        </div>
+        <div style="overflow:auto">
+            <table class="layui-table gdm-conns" lay-size="sm">
+                <thead>
+                <tr>
+                    <th>进程</th><th>机器 / 连接</th><th>状态</th><th>订阅</th><th>待发表 当前 / 峰值</th>
+                    <th>合并 (10 秒)</th><th>发出</th><th>流量构成</th><th>RTT 平均 / 最大</th><th>其他</th>
+                </tr>
+                </thead>
+                <tbody id="gdm-conns"></tbody>
+            </table>
+        </div>
+
+        <fieldset class="layui-elem-field layui-field-title">
+            <legend>分发事件 <span class="color-desc font-s12">最近 200 条匹配的；Redis 保留最近 2000 条</span></legend>
+        </fieldset>
+        <div class="margin-bottom-10">
+            <span class="color-desc font-s12">类型</span>
+            <select id="gdm-f-event" class="layui-input inline-block" style="width:150px">
+                <option value="">全部</option>
+                <option value="problem">只看异常</option>
+                {foreach $eventTypes as $key => $name}
+                <option value="{$key}">{$name}</option>
+                {/foreach}
+            </select>
+            <span class="color-desc font-s12 margin-left-10">进程</span>
+            <select id="gdm-f-market" class="layui-input inline-block" style="width:110px">
+                <option value="0">全部</option>
+                {foreach $marketTypes as $key => $name}
+                <option value="{$key}">{$name}</option>
+                {/foreach}
+            </select>
+            <span class="color-desc font-s12 margin-left-10">机器</span>
+            <select id="gdm-f-node" class="layui-input inline-block" style="width:160px">
+                <option value="">全部</option>
+            </select>
+            <span id="gdm-f-count" class="color-desc font-s12 margin-left-10"></span>
+        </div>
+        <div style="max-height:520px;overflow:auto">
+            <table class="layui-table" lay-size="sm">
+                <thead>
+                <tr><th style="width:150px">时间</th><th style="width:50px">进程</th><th style="width:80px">类型</th>
+                    <th style="width:120px">机器</th><th style="width:60px">连接</th><th style="width:120px">IP</th><th>详情</th></tr>
+                </thead>
+                <tbody id="gdm-events"></tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
+
+<script>
+(function () {
+    var REFRESH = {$refresh} * 1000;
+    var esc = function (s) { return layui.util.escape(s === null || s === undefined ? '' : String(s)); };
+    var span = function (cls, text) { return cls ? '<span class="' + cls + '">' + text + '</span>' : text; };
+
+    function kindsHtml(kinds) {
+        if (!kinds || !kinds.length) return '<span class="color-desc">-</span>';
+        return kinds.map(function (k) {
+            return '<span class="gdm-kind" title="' + esc(k.rate_text) + '">' + esc(k.kind) + ' <b>' + k.pct + '%</b></span>';
+        }).join('');
+    }
+
+    function renderAlerts(list) {
+        document.getElementById('gdm-alerts').innerHTML = list.map(function (a) {
+            return '<div class="layui-elem-quote layui-quote-nm ' + esc(a.color) + '">' + esc(a.text) + '</div>';
+        }).join('');
+    }
+
+    function renderProcs(list) {
+        document.getElementById('gdm-procs').innerHTML = list.map(function (p) {
+            var counters = p.counters.length ? p.counters.map(function (c) {
+                return span(c.color, esc(c.text) + ' ' + c.n);
+            }).join('　') : '-';
+            var rows = [
+                ['状态', span(p.state_color, esc(p.state_text))
+                    + (p.metric_age !== null ? ' <span class="color-desc font-s12">指标 ' + p.metric_age + 's 前</span>' : '')],
+                ['已运行', esc(p.uptime_text)],
+                ['订阅方', p.subscribers + ' 条连接'],
+                ['吞吐', esc(p.rate_text)],
+                ['数据来源', esc(p.source_text)],
+                ['待发表', esc(p.pending_text)],
+                ['运行时', esc(p.runtime_text)],
+                ['最近 10 秒', counters],
+                ['流量构成', kindsHtml(p.kinds)]
+            ];
+            return '<div class="layui-card"><div class="layui-card-header">'
+                + esc(p.label) + ' <span class="color-desc font-s12">监听 ' + esc(p.listen) + '</span></div>'
+                + '<div class="layui-card-body"><table class="layui-table" lay-size="sm"><tbody>'
+                + rows.map(function (r) {
+                    return '<tr><td class="color-desc" style="width:80px">' + r[0] + '</td><td>' + r[1] + '</td></tr>';
+                }).join('')
+                + '</tbody></table></div></div>';
+        }).join('');
+    }
+
+    function renderConns(list) {
+        document.getElementById('gdm-conn-count').textContent = list.length + ' 条';
+        if (!list.length) {
+            document.getElementById('gdm-conns').innerHTML = '<tr><td colspan="10" class="color-desc">当前没有订阅方连接</td></tr>';
+            return;
+        }
+        document.getElementById('gdm-conns').innerHTML = list.map(function (c) {
+            return '<tr>'
+                + '<td>' + esc(c.market_label) + '</td>'
+                + '<td><b>' + esc(c.node) + '</b>' + (c.sub ? ' <span class="color-desc">[' + esc(c.sub) + ']</span>' : '') + ' #' + c.conn
+                + '<div class="color-desc font-s12">' + esc(c.ip) + ' · 已连 ' + esc(c.alive_text) + '</div></td>'
+                + '<td>' + span(c.health_color, esc(c.health_text)) + '</td>'
+                + '<td style="max-width:260px;word-break:break-all">' + esc(c.streams) + '</td>'
+                + '<td>' + esc(c.pending_text)
+                + '<div class="layui-progress"><div class="layui-progress-bar ' + esc(c.pending_color)
+                + '" style="width:' + c.pending_pct + '%"></div></div></td>'
+                + '<td>' + (c.merged > 0 ? c.merged + ' 帧' : '<span class="color-desc">-</span>') + '</td>'
+                + '<td>' + esc(c.rate_text) + '</td>'
+                + '<td>' + kindsHtml(c.kinds) + '</td>'
+                + '<td>' + esc(c.rtt_text) + '</td>'
+                + '<td>' + (c.extra_text ? span('color-red', esc(c.extra_text)) : '') + '</td>'
+                + '</tr>';
+        }).join('');
+    }
+
+    // 机器下拉的选项来自事件流水，集合不变就不重建，免得冲掉正在用的选择
+    function syncNodes(nodes) {
+        var el = document.getElementById('gdm-f-node');
+        var sig = nodes.join('\u0001');
+        if (el.dataset.sig === sig) return;
+        el.dataset.sig = sig;
+        var want = el.value;
+        el.innerHTML = '<option value="">全部</option>' + nodes.map(function (n) {
+            return '<option value="' + esc(n) + '">' + esc(n) + '</option>';
+        }).join('');
+        el.value = nodes.indexOf(want) >= 0 ? want : '';
+    }
+
+    function renderEvents(list) {
+        document.getElementById('gdm-f-count').textContent = list.length + ' 条';
+        if (!list.length) {
+            document.getElementById('gdm-events').innerHTML = '<tr><td colspan="7" class="color-desc">暂无事件</td></tr>';
+            return;
+        }
+        document.getElementById('gdm-events').innerHTML = list.map(function (e) {
+            return '<tr><td>' + esc(e.at) + '</td><td>' + esc(e.market_label) + '</td>'
+                + '<td>' + span(e.type_color, esc(e.type_text)) + '</td>'
+                + '<td>' + esc(e.node) + (e.sub ? ' <span class="color-desc">[' + esc(e.sub) + ']</span>' : '') + '</td><td>#' + e.conn + '</td><td>' + esc(e.ip) + '</td>'
+                + '<td class="color-desc">' + esc(e.detail) + '</td></tr>';
+        }).join('');
+    }
+
+    function load() {
+        var qs = $.param({
+            event: document.getElementById('gdm-f-event').value,
+            market_type: document.getElementById('gdm-f-market').value,
+            node: document.getElementById('gdm-f-node').value
+        });
+        $.get('{:url("data")}?' + qs, function (res) {
+            if (res.code !== 1) return;
+            var d = res.data;
+            renderAlerts(d.alerts);
+            renderProcs(d.procs);
+            renderConns(d.conns);
+            syncNodes(d.nodes);
+            renderEvents(d.events);
+            document.getElementById('gdm-updated').innerText = '更新于 ' + d.now_at;
+        }, 'json');
+    }
+
+    ['gdm-f-event', 'gdm-f-market', 'gdm-f-node'].forEach(function (id) {
+        document.getElementById(id).addEventListener('change', load);
+    });
+
+    load();
+    setInterval(load, REFRESH);
+})();
+</script>
+{/block}

@@ -1,0 +1,28 @@
+<fieldset>
+    <legend>{:lang('条件搜索')}</legend>
+    <form class="layui-form layui-form-pane form-search" action="{:sysuri()}" onsubmit="return false" method="get" autocomplete="off">
+        <div class="layui-form-item layui-inline">
+            <label class="layui-form-label">{:lang('交易对ID')}</label>
+            <div class="layui-input-inline">
+                <input name="pair_id" value="{$get.pair_id|default=''}" placeholder="{:lang('请输入交易对ID')}" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item layui-inline">
+            <label class="layui-form-label">{:lang('周期')}</label>
+            <div class="layui-input-inline">
+                <select name="period" class="layui-select">
+                    <option value="">-- {:lang('全部周期')} --</option>
+                    {foreach $periods as $k=>$v}
+                    <option value="{$k}" {if ($get['period']??'') == $k}selected{/if}>{$v}</option>
+                    {/foreach}
+                </select>
+            </div>
+        </div>
+        <div class="layui-form-item layui-inline">
+            <button class="layui-btn layui-btn-primary"><i class="layui-icon">&#xe615;</i> {:lang('搜 索')}</button>
+        </div>
+        <div class="layui-form-item layui-inline">
+            <span class="help-block">{:lang('即分发给订阅方的 K 线')}</span>
+        </div>
+    </form>
+</fieldset>

@@ -1,0 +1,32 @@
+#!/bin/bash
+# Let's Encrypt，免费好用的 HTTPS 证书
+
+BASH_DIR=/home/deploy/market-relay/ssl
+WEB_DIR=/home/deploy/market-relay/root/public
+
+DOMAIN_NAMES=DNS:@SERVER_NAME@
+
+
+cd $BASH_DIR
+echo $BASH_DIR
+
+challenge_dir=$WEB_DIR/.well-known/acme-challenge
+mkdir -p $challenge_dir
+
+openssl genrsa 4096 > account.key
+openssl genrsa 4096 > domain_@SERVER_NAME@.key
+
+cat /etc/ssl/openssl.cnf > temp.conf
+echo "[SAN]" >> temp.conf
+echo "subjectAltName=$DOMAIN_NAMES" >> temp.conf
+openssl req -new -sha256 -key domain_@SERVER_NAME@.key -subj "/" -reqexts SAN -config temp.conf > domain.csr || exit
+
+acme_file=acme_tiny.py
+if [ ! -f "$acme_file" ]; then
+    wget https://raw.githubusercontent.com/diafygi/acme-tiny/master/acme_tiny.py
+fi
+python acme_tiny.py --account-key ./account.key --csr ./domain.csr --acme-dir $challenge_dir > signed.crt
+wget -O - https://letsencrypt.org/certs/lets-encrypt-x3-cross-signed.pem > intermediate.pem
+cat signed.crt intermediate.pem > chained_@SERVER_NAME@.pem
+wget -O - https://letsencrypt.org/certs/isrgrootx1.pem > root.pem
+cat intermediate.pem root.pem > full_chained.pem

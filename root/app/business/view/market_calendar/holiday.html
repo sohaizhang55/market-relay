@@ -1,0 +1,86 @@
+{extend name='../../admin/view/table'}
+
+{block name="button"}
+{if auth("holiday_add")}
+<button data-modal='{:url("holiday_add")}' data-title="{:lang('添加节假日')}"
+    class='layui-btn layui-btn-sm layui-btn-primary'>{:lang('添加节假日')}</button>
+{/if}
+{/block}
+
+{block name="content"}
+<div class="layui-tab layui-tab-card">
+    <div class="layui-tab-content">
+        {include file='market_calendar/holiday_search'}
+        <table id="HolidayTable" data-url="{:sysuri('holiday')}" data-target-search="form.form-search"></table>
+    </div>
+</div>
+{/block}
+
+{block name='script'}
+<script>
+    $(function () {
+        $('#HolidayTable').layTable({
+            even: true, height: 'full',
+            sort: { field: 'holiday_date', type: 'desc' },
+            cols: [[
+                { field: 'calendar_code', title: '{:lang("交易日历")}', minWidth: 180, align: 'center', templet: '#CalendarTpl' },
+                { field: 'timezone_text', title: '{:lang("时区")}', minWidth: 150, align: 'center' },
+                { field: 'holiday_date', title: '{:lang("休市日期")}', minWidth: 120, align: 'center', sort: true },
+                { field: 'close_type', title: '{:lang("休市类型")}', minWidth: 100, align: 'center', templet: '#CloseTypeTpl' },
+                { field: 'session_text', title: '{:lang("当日时段")}', minWidth: 130, align: 'center' },
+                { field: 'title', title: '{:lang("假日名称")}', minWidth: 160, align: 'center' },
+                { field: 'source', title: '{:lang("数据来源")}', minWidth: 100, align: 'center', templet: '#SourceTpl' },
+                { field: 'status', title: '{:lang("使用状态")}', minWidth: 110, align: 'center', templet: '#StatusSwitchTpl' },
+                { toolbar: '#Toolbar', title: '{:lang("操作面板")}', align: 'center', minWidth: 150, fixed: 'right' }
+            ]]
+        });
+
+        // 状态切换 (1=启用, 2=停用)
+        layui.form.on('switch(StatusSwitch)', function (obj) {
+            var data = { id: obj.value, status: obj.elem.checked ? 1 : 2 };
+            $.form.load("{:url('holiday_state')}", data, 'post', function (ret) {
+                if (ret.code < 1) $.msg.error(ret.info, 3, function () {
+                    $('#HolidayTable').trigger('reload');
+                }); else {
+                    $('#HolidayTable').trigger('reload')
+                }
+                return false;
+            }, false);
+        });
+    });
+</script>
+
+<!-- 交易日历：认不出的 MIC 由 Controller 标成红字 + ⚠，那一行永远匹配不上任何标的 -->
+<script type="text/html" id="CalendarTpl">
+    <span class="{{d.calendar_color}}">{{d.calendar_text}}</span>
+</script>
+
+<script type="text/html" id="CloseTypeTpl">
+    <span class="{{d.close_type_color}}">{{d.close_type_text}}</span>
+</script>
+
+<!-- 数据来源：自动导入的行会被 market:import_calendar 重跑覆盖，人工录入的不会 -->
+<script type="text/html" id="SourceTpl">
+    <span class="{{d.source_color}}">{{d.source_text}}</span>
+</script>
+
+<script type="text/html" id="StatusSwitchTpl">
+    {if auth("holiday_state")}
+    <input type="checkbox" value="{{d.id}}" lay-skin="switch" lay-text="{:lang('已启用')}|{:lang('已停用')}"
+        lay-filter="StatusSwitch" {{-d.status==1?'checked':''}}>
+    {else}
+    {{-d.status==1 ? '<b class="color-green">{:lang("已启用")}</b>' : '<b class="color-red">{:lang("已停用")}</b>'}}
+    {/if}
+</script>
+
+<script type="text/html" id="Toolbar">
+    {if auth("holiday_add")}
+    <a class="layui-btn layui-btn-sm" data-event-dbclick data-modal='{:url("holiday_add")}?id={{d.id}}'
+        data-title="{:lang('编辑节假日')}">{:lang('编 辑')}</a>
+    {/if}
+    {if auth("holiday_remove")}
+    <a class="layui-btn layui-btn-sm layui-btn-danger" data-confirm="{:lang('确定要删除该节假日吗？建议改用停用以保留记录。')}"
+        data-action='{:url("holiday_remove")}' data-value="id#{{d.id}}">{:lang('删 除')}</a>
+    {/if}
+</script>
+{/block}

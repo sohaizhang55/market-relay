@@ -1,0 +1,74 @@
+{extend name='../../admin/view/table'}
+
+{block name="content"}
+<div class="layui-tab layui-tab-card">
+    <div class="layui-tab-content table-content">
+        <fieldset>
+            <legend>
+                K 线走势
+                <span class="layui-btn-group" id="KlinePeriodBar" style="margin-left:15px;">
+                    {foreach $periods as $val=>$text}
+                    <button type="button" class="layui-btn layui-btn-xs {if $val=='900'}layui-btn-normal{else}layui-btn-primary{/if}" data-period="{$val}">{$text}</button>
+                    {/foreach}
+                </span>
+            </legend>
+            <div id="KlineChart" style="height:520px;"></div>
+        </fieldset>
+    </div>
+</div>
+{/block}
+
+{block name='script'}
+<script>
+    $(function () {
+        var pairId = {$pairId|default=0};
+        var currentPeriod = '900';
+        var chart = null;
+
+        // K 线走势 (echarts candlestick + 成交量副图)，不自动轮询，按需手动刷新页面
+        require(['echarts'], function (echarts) {
+            chart = echarts.init(document.getElementById('KlineChart'));
+            loadKline(currentPeriod);
+        });
+
+        function loadKline(period) {
+            $.ajax({
+                url: "{:url('kline_preview_data')}", data: { pair_id: pairId, period: period }, dataType: 'json',
+                success: function (res) {
+                    if (!chart) return;
+                    chart.setOption({
+                        tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+                        grid: [
+                            { left: 60, right: 30, top: 20, height: '62%' },
+                            { left: 60, right: 30, top: '78%', height: '15%' }
+                        ],
+                        xAxis: [
+                            { type: 'category', data: res.categories, boundaryGap: true, axisLine: { onZero: false } },
+                            { type: 'category', gridIndex: 1, data: res.categories, axisLine: { onZero: false }, axisLabel: { show: false } }
+                        ],
+                        yAxis: [
+                            { scale: true, gridIndex: 0 },
+                            { gridIndex: 1, splitNumber: 2, axisLabel: { show: false }, axisLine: { show: false }, splitLine: { show: false } }
+                        ],
+                        dataZoom: [{ type: 'inside', xAxisIndex: [0, 1] }],
+                        series: [
+                            {
+                                type: 'candlestick', data: res.ohlc, xAxisIndex: 0, yAxisIndex: 0,
+                                itemStyle: { color: '#16b877', color0: '#ea3d2f', borderColor: '#16b877', borderColor0: '#ea3d2f' }
+                            },
+                            { type: 'bar', xAxisIndex: 1, yAxisIndex: 1, data: res.vols, itemStyle: { color: '#c2c2c2' } }
+                        ]
+                    }, true);
+                }
+            });
+        }
+
+        $('#KlinePeriodBar').on('click', 'button', function () {
+            currentPeriod = $(this).data('period') + '';
+            $('#KlinePeriodBar button').removeClass('layui-btn-normal').addClass('layui-btn-primary');
+            $(this).removeClass('layui-btn-primary').addClass('layui-btn-normal');
+            loadKline(currentPeriod);
+        });
+    });
+</script>
+{/block}

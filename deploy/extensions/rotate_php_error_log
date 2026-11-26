@@ -1,0 +1,6 @@
+/home/deploy/market-relay/logs/php_error.log {
+    daily
+    rotate 3
+    missingok
+    notifempty  
+}

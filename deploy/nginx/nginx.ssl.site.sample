@@ -1,0 +1,9 @@
+server { 
+    server_name @SERVER_NAME@; 
+    listen 443 ssl; 
+    listen 23344 ssl; 
+    listen 40057 ssl; 
+    ssl_certificate     /home/deploy/market-relay/ssl/chained_@SERVER_NAME@.pem;
+    ssl_certificate_key /home/deploy/market-relay/ssl/domain_@SERVER_NAME@.key;
+    include /home/deploy/market-relay/deploy/nginx/nginx.site.common; 
+} 

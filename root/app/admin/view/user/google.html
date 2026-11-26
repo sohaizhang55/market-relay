@@ -1,0 +1,39 @@
+<form class="layui-form layui-card" action="{:sysuri()}" data-auto="true" method="post" autocomplete="off">
+    <div class="layui-card-body padding-left-40">
+        {if $is_bind}
+        <div class="color-red text-center margin-bottom-20">
+            <i class="layui-icon layui-icon-vercode" style="font-size:48px"></i>
+            <p class="margin-top-10">该账号已完成 Google 2FA 绑定</p>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label color-green">解绑验证</label>
+            <div class="layui-input-block">
+                <input name="code" required placeholder="请输入 6 位动态验证码" maxlength="6" class="layui-input">
+                <p class="help-block">请输入您手机 App 上的 6 位动态码以确认解绑。</p>
+            </div>
+        </div>
+        <input type="hidden" name="action" value="unbind">
+        {else}
+        <div class="text-center margin-bottom-20">
+            <img src="{$qrcode}" style="width:180px;height:180px;border:1px solid #eee;padding:5px">
+            <p class="color-desc margin-top-10">请使用 Google Authenticator 或身份宝扫码</p>
+            <p class="color-desc">手动输入密钥：<b class="color-red">{$secret}</b></p>
+        </div>
+        <div class="layui-form-item">
+            <label class="layui-form-label color-green">绑定验证</label>
+            <div class="layui-input-block">
+                <input name="code" required placeholder="请输入 6 位动态验证码" maxlength="6" class="layui-input">
+                <p class="help-block">扫码添加后，输入产生的 6 位动态码进行首次验证。</p>
+            </div>
+        </div>
+        {/if}
+        <input type="hidden" name="id" value="{$Think.get.id}">
+    </div>
+
+    <div class="hr-line-dashed"></div>
+
+    <div class="layui-form-item text-center">
+        <button class="layui-btn" type='submit'>{if $is_bind}确认解绑{else}确认绑定{/if}</button>
+        <button class="layui-btn layui-btn-danger" type='button' data-confirm="确定要取消操作吗？" data-close>取消操作</button>
+    </div>
+</form>

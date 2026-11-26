@@ -1,0 +1,30 @@
+{extend name='../../admin/view/table'}
+
+{block name="content"}
+<div class="layui-tab layui-tab-card table-block">
+    <div class="layui-tab-content table-content">
+        {include file='market/depth_search'}
+        <table id="RawDepthTable" data-url="{:sysuri('depth')}?source_key={$sourceKey}" data-target-search="form.form-search"></table>
+    </div>
+</div>
+
+<script>
+    $(function () {
+        $('#RawDepthTable').layTable({
+            even: true, height: 'full', page: false,
+            text: { none: '暂无数据（该行情源尚未采集到深度，或采集进程未运行）' },
+            done: function (res) {
+                // 切换行情源走的是 ajax 局部刷新、不重渲染整页，缓存时间要随每次表格数据一起更新
+                $('#DepthAtText').text(res.depth_at || '-');
+            },
+            cols: [[
+                { field: 'bid_qty', title: '买量', width: 180, align: 'right', templet: function (d) { return '<span class="color-green">' + d.bid_qty + '</span>'; } },
+                { field: 'bid_price', title: '买价', width: 180, align: 'right', templet: function (d) { return '<span class="color-green">' + d.bid_price + '</span>'; } },
+                { field: 'level', title: '档位', width: 80, align: 'center' },
+                { field: 'ask_price', title: '卖价', width: 180, align: 'right', templet: function (d) { return '<span class="color-red">' + d.ask_price + '</span>'; } },
+                { field: 'ask_qty', title: '卖量', width: 180, align: 'right', templet: function (d) { return '<span class="color-red">' + d.ask_qty + '</span>'; } }
+            ]]
+        });
+    });
+</script>
+{/block}

@@ -1,0 +1,92 @@
+{extend name='../../admin/view/table'}
+
+{block name="button"}
+{if auth("add")}
+<button data-modal='{:url("add")}' data-title="{:lang('新增交易对')}" class='layui-btn layui-btn-sm layui-btn-primary'>{:lang('新增交易对')}</button>
+{/if}
+{/block}
+
+{block name="content"}
+<div class="layui-tab layui-tab-card">
+    <div class="layui-tab-content">
+        <div style="margin-bottom:10px;font-size:13px" class="color-desc">
+            {:lang('订阅方按「订阅标识」在 hello 里写 stream（如 btcusdt@ticker），连对应端口；收到的帧用「分发标识」pair（交易对代码_类型）对号入座。价格即正在分发的值；交易对可新增、编辑（代码与类型创建后不能改，不提供删除），主源 / 备源在每行的「数据源」里管理。对接细节见「分发对接说明」')}
+        </div>
+        {include file='exchange_pair/index_search'}
+        <table id="ExchangePairTable" data-url="{:sysuri('index')}" data-target-search="form.form-search"></table>
+    </div>
+</div>
+
+<script>
+    $(function () {
+        $('#ExchangePairTable').layTable({
+            even: true, height: 'full',
+            cols: [[
+                { field: 'id', title: 'ID', width: 70, align: 'center' },
+                { field: 'symbol', title: '交易对', minWidth: 120, align: 'center', templet: '<div><b>{{d.symbol}}</b></div>' },
+                { field: 'pair', title: '分发标识', minWidth: 120, align: 'center', templet: '<div><code>{{d.pair}}</code></div>' },
+                { field: 'stream_symbol', title: '订阅标识', minWidth: 170, align: 'center', templet: '#StreamTpl' },
+                { field: 'type', title: '类型', width: 100, align: 'center', templet: '<div><span class="layui-badge {{d.type_color}}">{{d.type_text}}</span></div>' },
+                { field: 'status', title: '状态', width: 90, align: 'center', templet: '<div><span class="layui-badge {{d.status_color}}">{{d.status_text}}</span></div>' },
+                { field: 'last_price', title: '最新价', minWidth: 120, align: 'right', templet: '<div><b>{{d.price_text}}</b></div>' },
+                { field: 'change', title: '24h 涨跌', width: 100, align: 'right', templet: '<div><span class="{{d.change_color}}">{{d.change_text}}</span></div>' },
+                { field: 'market_ts', title: '最后行情', width: 170, align: 'center', templet: '<div><span class="{{d.market_color}}">{{d.market_ts_text}}</span></div>' },
+                { field: 'mark_price', title: '标记价格', minWidth: 120, align: 'right', templet: '<div>{{d.mark_price_text}}</div>' },
+                { field: 'funding_rate', title: '资金费率', minWidth: 110, align: 'right', templet: '<div><span class="{{d.funding_color}}">{{d.funding_text}}</span></div>' },
+                { field: 'funding_rate_ts', title: '费率时间', width: 170, align: 'center', templet: '<div><span class="{{d.funding_at_color}}">{{d.funding_at}}</span></div>' },
+                { field: 'precision_price', title: '价格精度', width: 90, align: 'center' },
+                { field: 'precision_amount', title: '数量精度', width: 90, align: 'center' },
+                { field: 'source_key', title: '当前数据源', minWidth: 260, templet: '#SourceTpl' },
+                { field: 'select_text', title: '选源状态', width: 110, align: 'center', templet: '#SelectTpl' },
+                { toolbar: '#Toolbar', title: '操作', align: 'center', width: 390, fixed: 'right' }
+            ]]
+        });
+    });
+</script>
+
+<!-- 订阅标识：hello 里写 {symbol}@{stream}，连哪个端口决定现货 / 合约；悬停看这个交易对能订的全部 stream -->
+<script type="text/html" id="StreamTpl">
+    <span title="{{d.streams_title}}"><code>{{d.stream_symbol}}@…</code> <span class="color-desc">端口 {{d.stream_port}}</span></span>
+</script>
+
+<!-- 当前数据源：主源蓝、跑在备源上橙、生效源不在绑定里红（选源进程切不回来，要人处理） -->
+<script type="text/html" id="SourceTpl">
+    {{# if (d.source_role_text) { }}<span class="layui-badge {{d.source_role_color}}">{{d.source_role_text}}</span>{{# } }}
+    <span class="color-desc">{{d.source_text}}</span>
+    {{# if (d.source_count > 1) { }}<span class="color-desc">（{{d.source_count}} 个源）</span>{{# } }}
+</script>
+
+<!-- 选源状态：锁定红（要人解锁）、全部不健康红、无数据橙（选源进程没在跑）、未启用灰、单源纯文字 -->
+<script type="text/html" id="SelectTpl">
+    {{# if (d.select_color) { }}
+    <span class="layui-badge {{d.select_color}}" title="{{d.select_title}}">{{d.select_text}}</span>
+    {{# } else { }}
+    <span class="color-desc" title="{{d.select_title}}">{{d.select_text}}</span>
+    {{# } }}
+</script>
+
+<script type="text/html" id="Toolbar">
+    {if auth("edit")}
+    <a class="layui-btn layui-btn-sm" data-modal='{:url("edit")}?id={{d.id}}' data-title="编辑交易对[{{d.pair}}]">编辑</a>
+    {/if}
+    {if auth("kline_preview")}
+    <a class="layui-btn layui-btn-sm layui-btn-warm" data-open='{:url("kline_preview")}?pair_id={{d.id}}' data-title="K线预览[{{d.pair}}]" data-full="true">K线</a>
+    {/if}
+    {if auth("depth")}
+    <a class="layui-btn layui-btn-sm layui-btn-primary" data-open='{:url("depth")}?pair_id={{d.id}}' data-title="盘口深度[{{d.pair}}]" data-full="true">盘口</a>
+    {/if}
+    {if auth("depth_trades")}
+    <a class="layui-btn layui-btn-sm layui-btn-primary" data-open='{:url("depth_trades")}?pair_id={{d.id}}' data-title="成交流水[{{d.pair}}]" data-full="true">成交</a>
+    {/if}
+    {if auth("business/exchange_pair_source/index")}
+    <a class="layui-btn layui-btn-sm layui-btn-normal" data-open='{:url("exchange_pair_source/index")}?pair_id={{d.id}}'
+        data-title="数据源[{{d.pair}}]" data-full="true">数据源</a>
+    {/if}
+    {if auth("unlock")}
+    {{# if (d.locked) { }}
+    <a class="layui-btn layui-btn-sm layui-btn-danger" data-action='{:url("unlock")}' data-value="id#{{d.id}}"
+        data-confirm="确定解锁 {{d.pair}} 吗？解锁后选源进程会恢复自动切换，请先确认主源已经稳定。">解锁</a>
+    {{# } }}
+    {/if}
+</script>
+{/block}

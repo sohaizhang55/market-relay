@@ -1,0 +1,43 @@
+<form class="layui-form layui-card" action="{:sysuri()}" data-auto="true" method="post" autocomplete="off">
+    <div class="layui-card-body padding-left-40">
+        <label class="layui-form-item block relative">
+            <span class="help-label"><b>订阅方名称</b> (监控页与日志里显示，例如 biz-b1)</span>
+            <input name="name" value='{$vo.name|default=""}' required vali-name="订阅方名称" maxlength="64" placeholder="请输入订阅方名称" class="layui-input">
+        </label>
+
+        {if isset($vo.token)}
+        <div class="layui-form-item">
+            <span class="help-label"><b>Token</b> (订阅方放在 X-Inner-Token 请求头里；要换请回列表点「重置 token」)</span>
+            <div class="layui-input-inline" style="width:340px">
+                <input id="SubscriberToken" value="{$vo.token}" readonly class="layui-input">
+            </div>
+            <button class="layui-btn layui-btn-primary" type="button" data-copy="{$vo.token}">复 制</button>
+        </div>
+        {else}
+        <div class="layui-form-item">
+            <span class="help-label"><b>Token</b></span>
+            <div class="help-block">保存后自动生成，在列表的 Token 列点「复制」即可。</div>
+        </div>
+        {/if}
+
+        <div class="layui-form-item">
+            <span class="help-label"><b>状态</b> (停用后这个 token 立即作废)</span>
+            <div class="layui-textarea">
+                {foreach $statuses as $k=>$v}
+                <input type="radio" name="status" value="{$k}" title="{$v}" {if (isset($vo.status) && $vo.status eq $k) || (!isset($vo.status) && $k eq 1)}checked{/if}>
+                {/foreach}
+            </div>
+        </div>
+
+        <label class="layui-form-item block relative">
+            <span class="help-label"><b>备注</b></span>
+            <input name="remark" value='{$vo.remark|default=""}' maxlength="255" placeholder="选填" class="layui-input">
+        </label>
+    </div>
+    <div class="hr-line"></div>
+    {if isset($vo.id)}<input type='hidden' value='{$vo.id}' name='id'>{/if}
+    <div class="layui-form-item text-center">
+        <button class="layui-btn" type='submit'>确认保存</button>
+        <button class="layui-btn layui-btn-danger" type='button' data-confirm="确定要取消吗？" data-close>取消</button>
+    </div>
+</form>

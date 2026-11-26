@@ -1,0 +1,24 @@
+<form class="layui-form layui-card" action="{:sysuri()}" data-auto="true" method="post" autocomplete="off">
+    <div class="layui-card-body padding-left-40 padding-right-40">
+        <div class="layui-form-item">
+            <span class="help-label"><b>分发鉴权</b></span>
+            <div class="layui-textarea">
+                {foreach $statuses as $k=>$v}
+                <input type="radio" name="auth_enabled" value="{$k}" title="{$v}" {if $current eq $k}checked{/if}>
+                {/foreach}
+            </div>
+            <div class="help-block">
+                <b>启用</b>：WS 分发（PHP 与 Go）握手时不带有效 X-Inner-Token 直接回 403，连接建不起来。<br>
+                <b>禁用</b>：不带 token 也能连；带了有效 token 的照样认出是谁、记下来源 IP。<br>
+                打开前先确认列表里每个订阅方的「最后 WS 连接」都有时间 —— 没有的说明它还没带 token，一打开就会断。<br>
+                /inner_api/* 不受这个开关影响：它一直要求 token（订阅方 token 或本机 .env 的 MARKET_INNER_API_TOKEN）。<br>
+                改完最长 5 秒生效，不需要重启任何进程。
+            </div>
+        </div>
+    </div>
+    <div class="hr-line"></div>
+    <div class="layui-form-item text-center">
+        <button class="layui-btn" type='submit'>保存配置</button>
+        <button class="layui-btn layui-btn-danger" type='button' data-confirm="确定要取消吗？" data-close>取消</button>
+    </div>
+</form>

@@ -1,0 +1,70 @@
+<fieldset>
+    <legend>{:lang('条件搜索')}</legend>
+    <form class="layui-form layui-form-pane form-search" action="{:sysuri('session')}" onsubmit="return false"
+        method="get" autocomplete="off">
+        <div class="layui-form-item layui-inline">
+            <label class="layui-form-label">{:lang('交易日历')}</label>
+            <div class="layui-input-inline">
+                <select class="layui-select" name="calendar_code">
+                    <option value=''>-- {:lang('全部')} --</option>
+                    {foreach $calendars as $code=>$text}
+                    {if input('get.calendar_code') eq (string)$code}
+                    <option selected value="{$code}">{$text}</option>
+                    {else}
+                    <option value="{$code}">{$text}</option>
+                    {/if}
+                    {/foreach}
+                </select>
+            </div>
+        </div>
+        <div class="layui-form-item layui-inline">
+            <label class="layui-form-label">{:lang('开盘星期')}</label>
+            <div class="layui-input-inline">
+                <select class="layui-select" name="open_week_day">
+                    <option value=''>-- {:lang('全部')} --</option>
+                    {foreach $weekDays as $k=>$v}
+                    {if input('get.open_week_day') eq (string)$k}
+                    <option selected value="{$k}">{$v}</option>
+                    {else}
+                    <option value="{$k}">{$v}</option>
+                    {/if}
+                    {/foreach}
+                </select>
+            </div>
+        </div>
+        <div class="layui-form-item layui-inline">
+            <label class="layui-form-label">{:lang('数据来源')}</label>
+            <div class="layui-input-inline">
+                <select class="layui-select" name="source">
+                    <option value=''>-- {:lang('全部')} --</option>
+                    {foreach ['exchange_calendars'=>lang('自动导入'),'manual'=>lang('人工录入')] as $k=>$v}
+                    {if input('get.source') eq (string)$k}
+                    <option selected value="{$k}">{$v}</option>
+                    {else}
+                    <option value="{$k}">{$v}</option>
+                    {/if}
+                    {/foreach}
+                </select>
+            </div>
+        </div>
+        <div class="layui-form-item layui-inline">
+            <label class="layui-form-label">{:lang('使用状态')}</label>
+            <div class="layui-input-inline">
+                <select class="layui-select" name="status">
+                    <option value=''>-- {:lang('全部')} --</option>
+                    {foreach $statuses as $k=>$v}
+                    {if input('get.status') eq (string)$k}
+                    <option selected value="{$k}">{$v}</option>
+                    {else}
+                    <option value="{$k}">{$v}</option>
+                    {/if}
+                    {/foreach}
+                </select>
+            </div>
+        </div>
+        <div class="layui-form-item layui-inline">
+            <button type="submit" class="layui-btn layui-btn-primary"><i class="layui-icon">&#xe615;</i> {:lang('搜 索')}</button>
+            <button type='reset' class="layui-btn layui-btn-primary"><i class="layui-icon">&#xe666;</i> {:lang('重 置')}</button>
+        </div>
+    </form>
+</fieldset>

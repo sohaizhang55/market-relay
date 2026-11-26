@@ -1,0 +1,18 @@
+#!/bin/bash
+# Let's Encrypt，免费好用的 HTTPS 证书  3 个月到期  需要更新
+BASH_DIR=/home/deploy/market-relay/ssl
+WEB_DIR=/home/deploy/market-relay/root/public
+echo $BASH_DIR
+cd $BASH_DIR
+
+acme_file=acme_tiny.py
+if [ ! -f "$acme_file" ]; then
+    wget https://raw.githubusercontent.com/diafygi/acme-tiny/master/acme_tiny.py
+fi
+
+python acme_tiny.py --account-key account.key --csr domain.csr --acme-dir $WEB_DIR/.well-known/acme-challenge/ > signed.crt || exit
+wget -O - https://letsencrypt.org/certs/lets-encrypt-x3-cross-signed.pem > intermediate.pem
+cat signed.crt intermediate.pem > chained.pem
+wget -O - https://letsencrypt.org/certs/isrgrootx1.pem > root.pem
+cat intermediate.pem root.pem > full_chained.pem
+#service nginx reload

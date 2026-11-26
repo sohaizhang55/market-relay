@@ -1,0 +1,53 @@
+<fieldset>
+    <legend>{:lang('条件搜索')}</legend>
+    <form class="layui-form layui-form-pane form-search" action="{:sysuri()}" onsubmit="return false" method="get" autocomplete="off">
+        <div class="layui-form-item layui-inline">
+            <label class="layui-form-label">{:lang('交易所')}</label>
+            <div class="layui-input-inline">
+                <select name="exchange">
+                    <option value="">{:lang('全部')}</option>
+                    {foreach $exchanges as $k=>$v}
+                    <option value="{$k}" {if ($get.exchange??'') == $k}selected{/if}>{$v}</option>
+                    {/foreach}
+                </select>
+            </div>
+        </div>
+        <div class="layui-form-item layui-inline">
+            <label class="layui-form-label">{:lang('类型')}</label>
+            <div class="layui-input-inline">
+                <select name="type">
+                    <option value="">{:lang('全部')}</option>
+                    {foreach $types as $k=>$v}
+                    <option value="{$k}" {if ($get.type??'') == $k}selected{/if}>{$v}</option>
+                    {/foreach}
+                </select>
+            </div>
+        </div>
+        <div class="layui-form-item layui-inline">
+            <label class="layui-form-label">{:lang('产品类型')}</label>
+            <div class="layui-input-inline">
+                <select name="category_code">
+                    <option value="">{:lang('全部')}</option>
+                    {foreach $categories as $k=>$v}
+                    <option value="{$k}" {if ($get.category_code??'') == $k}selected{/if}>{$v}</option>
+                    {/foreach}
+                </select>
+            </div>
+        </div>
+        <div class="layui-form-item layui-inline">
+            <label class="layui-form-label">{:lang('币种代码')}</label>
+            <div class="layui-input-inline">
+                <input name="symbol" value="{$get.symbol|default=''}" placeholder="{:lang('如 btcusdt')}" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item layui-inline">
+            <label class="layui-form-label">{:lang('来源标识')}</label>
+            <div class="layui-input-inline">
+                <input name="source_key" value="{$get.source_key|default=''}" placeholder="{:lang('如 BINANCE_btcusdt_1')}" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item layui-inline">
+            <button class="layui-btn layui-btn-primary"><i class="layui-icon">&#xe615;</i> {:lang('搜 索')}</button>
+        </div>
+    </form>
+</fieldset>

@@ -1,0 +1,104 @@
+<form action="{:sysuri()}" method="post" data-auto="true" class="layui-form layui-card" data-table-id="SessionTable">
+    <div class="layui-card-body padding-left-40">
+
+        <fieldset class="layui-bg-gray">
+            <legend><b class="layui-badge think-bg-violet">{:lang('开市时段')}</b></legend>
+
+            <div class="layui-row layui-col-space15">
+                <div class="layui-col-xs12">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('交易日历')}</b>Calendar</span>
+                        <select name="calendar_code" class="layui-select" lay-search required vali-name="{:lang('交易日历')}">
+                            <option value="">-- {:lang('请选择')} --</option>
+                            {foreach $calendars as $code=>$text}
+                            <option value="{$code}" {if ($vo.calendar_code ?? "") eq $code}selected{/if}>{$text}</option>
+                            {/foreach}
+                        </select>
+                        <span class="help-block">{:lang('按作息归类，不是按上市地 —— 作息不同就必须另开一本日历，哪怕假日完全一样。下面填的时间是该日历所属时区的本地时间。')}</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="layui-row layui-col-space15 margin-top-10">
+                <div class="layui-col-xs6">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('开盘星期')}</b>Open Day</span>
+                        <select name="open_week_day" class="layui-select" required vali-name="{:lang('开盘星期')}">
+                            {foreach $weekDays as $k=>$v}
+                            <option value="{$k}" {if ($vo.open_week_day ?? "") eq $k}selected{/if}>{$v}</option>
+                            {/foreach}
+                        </select>
+                    </label>
+                </div>
+                <div class="layui-col-xs6">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('开盘时间')}</b>Open</span>
+                        <input name="open_time" value='{$vo.open_time|default=""}' required vali-name="{:lang('开盘时间')}"
+                            placeholder="{:lang('如 09:30')}" class="layui-input">
+                        <span class="help-block">{:lang('24 小时制 HH:MM，须两位补零。')}</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="layui-row layui-col-space15 margin-top-10">
+                <div class="layui-col-xs6">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('收盘星期')}</b>Close Day</span>
+                        <select name="close_week_day" class="layui-select" required vali-name="{:lang('收盘星期')}">
+                            {foreach $weekDays as $k=>$v}
+                            <option value="{$k}" {if ($vo.close_week_day ?? "") eq $k}selected{/if}>{$v}</option>
+                            {/foreach}
+                        </select>
+                        <span class="help-block">{:lang('与开盘星期不同即为跨天段。')}</span>
+                    </label>
+                </div>
+                <div class="layui-col-xs6">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('收盘时间')}</b>Close</span>
+                        <input name="close_time" value='{$vo.close_time|default=""}' required vali-name="{:lang('收盘时间')}"
+                            placeholder="{:lang('如 16:00')}" class="layui-input">
+                        <span class="help-block">{:lang('区间左闭右开，收盘这一刻已不在时段内。')}</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="layui-row layui-col-space15 margin-top-10">
+                <div class="layui-col-xs6">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('使用状态')}</b>Status</span>
+                        <select name="status" class="layui-select" required vali-name="{:lang('使用状态')}">
+                            {foreach $statuses as $k=>$v}
+                            <option value="{$k}" {if ($vo.status ?? "") eq $k}selected{/if}>{$v}</option>
+                            {/foreach}
+                        </select>
+                        <span class="help-block">{:lang('停用的时段不参与休市判定，也不参与重叠检测。')}</span>
+                    </label>
+                </div>
+                <div class="layui-col-xs6">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('备注')}</b>Remark</span>
+                        <input name="remark" value='{$vo.remark|default=""}' placeholder="{:lang('选填')}" class="layui-input">
+                    </label>
+                </div>
+            </div>
+
+            <!-- 跨天段是本表最反直觉的地方，不解释运维会照「一天一段」的惯性去拆，
+                 而拆开之后假日归属就错了（见迁移 20260915100000 的类注释） -->
+            <blockquote class="layui-elem-quote layui-quote-nm margin-top-15">
+                {:lang('跨天怎么填：黄金是「周日 17:00 开 → 周一 17:00 收」，填成开盘星期=周日、收盘星期=周一，这是一个完整交易日，不要拆成两段。')}
+                <br>
+                {:lang('在此保存的时段会标记为「人工录入」，不会被自动导入命令覆盖，但也不再跟随上游日历更新。')}
+            </blockquote>
+
+        </fieldset>
+
+    </div>
+
+    <div class="hr-line-dashed"></div>
+    {notempty name='vo.id'}<input type='hidden' value='{$vo.id}' name='id'>{/notempty}
+
+    <div class="layui-form-item text-center">
+        <button class="layui-btn" type='submit'>{:lang('保存数据')}</button>
+        <button class="layui-btn layui-btn-danger" type='button' data-confirm="{:lang('确定要取消编辑吗？')}" data-close>{:lang('取消编辑')}</button>
+    </div>
+</form>

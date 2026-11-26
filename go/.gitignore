@@ -1,0 +1,14 @@
+# 本机配置，模板是 .env.example
+.env
+
+# 编译产物。编译请用 -o 指定名字（例如 go build -o market_dispatch.exe .），
+# 否则产物会叫 go.exe，在 cmd 里会盖掉 Go 工具链本身
+*.exe
+*.exe~
+/go
+/market_dispatch
+# market_dispatch_go（Linux 版）刻意进 git：测试服靠 git pull 拿二进制，不装 Go。
+# 编译必须带 -buildvcs=false -trimpath，Go 源码不变时产物逐字节相同，不会白占仓库空间
+
+# install.sh 的日志与 pid 文件
+/logs/

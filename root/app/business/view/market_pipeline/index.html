@@ -1,0 +1,239 @@
+{extend name="../../admin/view/main"}
+
+{block name="content"}
+<div class="layui-card">
+    <div class="layui-card-header">
+        落库链路诊断
+        <span class="color-desc font-s12">
+            把「收到帧 → 进热层 → 标脏 → 落库」四站的时间戳并排比对，直接指出卡在哪一站
+            · 判定用的陈旧阈值 {$staleSeconds} 秒（market.stale_seconds）
+        </span>
+        <div class="pull-right">
+            <span id="mp-updated" class="color-desc font-s12"></span>
+        </div>
+    </div>
+    <div class="layui-card-body">
+
+        <div class="layui-form layui-form-pane margin-bottom-15">
+            <div class="layui-inline">
+                <label class="layui-form-label">交易对</label>
+                <div class="layui-input-inline" style="width:220px">
+                    <input id="mp-kw" class="layui-input" placeholder="source_key 关键字，如 btcusdt">
+                </div>
+            </div>
+            <div class="layui-inline">
+                <label class="layui-form-label">数据组</label>
+                <div class="layui-input-inline" style="width:160px">
+                    <select id="mp-group">
+                        <option value="">全部</option>
+                        {foreach $groups as $k => $label}
+                        <option value="{$k}">{$label}</option>
+                        {/foreach}
+                    </select>
+                </div>
+            </div>
+            <div class="layui-inline">
+                <label class="layui-form-label">范围</label>
+                <div class="layui-input-inline" style="width:130px">
+                    <select id="mp-onlybad">
+                        <option value="1">只看异常</option>
+                        <option value="">全部</option>
+                    </select>
+                </div>
+            </div>
+            <div class="layui-inline">
+                <button class="layui-btn" onclick="mpLoad()">查询</button>
+                <span class="color-desc font-s12 margin-left-10">
+                    进页面已按默认条件查询；本页要查 MySQL，故不自动轮询
+                </span>
+            </div>
+        </div>
+
+        <div id="mp-flusher" class="margin-bottom-15"></div>
+
+        <table class="layui-table" lay-size="sm">
+            <thead>
+            <tr>
+                <th>source_key</th>
+                <th>数据组</th>
+                <th>① 收到帧</th>
+                <th title="这一路最后一次被 REST 兜底刷新的时间。空 = 一直是 WS 在供数。&#10;有值且比①新，说明 WS 已断、时间戳是兜底刷出来的">⓪ REST 兜底</th>
+                <th>② 热层</th>
+                <th>③ 脏集合</th>
+                <th>④ 库</th>
+                <th>热层−库</th>
+                <th>值（热层 / 库）</th>
+                <th style="min-width:300px">判定</th>
+            </tr>
+            </thead>
+            <tbody id="mp-rows">
+            <tr><td colspan="9" class="text-center color-desc">加载中…</td></tr>
+            </tbody>
+        </table>
+
+        <fieldset class="layui-elem-field layui-field-title">
+            <legend>怎么读这张表</legend>
+        </fieldset>
+        <table class="layui-table" lay-size="sm">
+            <thead><tr><th style="width:230px">判定</th><th>含义与下一步</th></tr></thead>
+            <tbody>
+            <tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#c00;margin-right:6px;vertical-align:middle"></span><span style="color:#c00">⓪ 靠兜底续命</span></td>
+                <td>WS 已断，update_ts 是 REST 兜底刷出来的 —— <b>时间戳新鲜不代表行情在正常流入</b>。
+                    兜底只有当前价（OHLC 被置为同一个值）、没有深度与成交，频率低一到两个数量级，K 线会长出一串平底。
+                    查采集器进程与交易所连接。</td></tr>
+            <tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#c00;margin-right:6px;vertical-align:middle"></span><span style="color:#c00">① 没收到帧</span></td>
+                <td>本机压根没收到这一路的数据（<code>collect</code>/<code>land</code> 埋点已经陈旧）。跟落库无关，去查分发链路：分发机的 <code>snap=脏/总</code> / <code>ksendq</code> / <code>sndbuf</code>，以及订阅方的 <code>drop(...)</code>。</td></tr>
+            <tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#c47100;margin-right:6px;vertical-align:middle"></span><span style="color:#c47100">③ 等待刷盘</span></td>
+                <td>数据在热层、也标脏了，正等 <code>MarketDbFlusher</code> 写库。正常应当 &lt;1 秒。<b>持续停在这个状态</b>才是问题 —— 看上面 flusher 卡片的 <code>dirty</code> 是不是在涨、<code>ms</code> 是不是接近 interval。</td></tr>
+            <tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#c00;margin-right:6px;vertical-align:middle"></span><span style="color:#c00">④ 刷盘丢失</span></td>
+                <td><b>最隐蔽的一种。</b>热层比库新，但 key 已经不在脏集合里了 —— 说明刷盘那一轮把它取走了却没写成功。看 flusher 卡片的 <code>fail</code> 与 <code>runtime/log</code> 里的 <code>batchUpdate</code> 错误。</td></tr>
+            <tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#c47100;margin-right:6px;vertical-align:middle"></span><span style="color:#c47100">帧在收，但交易所时间戳没前进</span></td>
+                <td>埋点是新的（<b>我们确实在收、也确实写进了热层</b>），但帧上带的交易所时钟没往前走。热层的 <code>update_ts</code>/<code>mark_ts</code> 存的是<b>交易所打在帧上的时间</b>而不是我们的写入时间，所以这一格陈旧只说明上游给的时间戳旧。查采集器的 <code>age</code> 指标与本机时钟偏差。</td></tr>
+            <tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#c47100;margin-right:6px;vertical-align:middle"></span><span style="color:#c47100">整条链路都没有新数据</span></td>
+                <td>四站一致且都旧了，埋点也没有新的 —— 上游本来就没更新。冷门交易对、交易所静默、<b>或者这一路已经下架/改名但配置还留着</b>，都会长这样，通常不是故障。</td></tr>
+            <tr><td colspan="2" style="background:#fafafa"><b>K线 60s</b> 这一组的差异 —— 它的「热层」列读的是 Redis 缓冲，语义和上面几组<b>相反</b></td></tr>
+            <tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#c00;margin-right:6px;vertical-align:middle"></span><span style="color:#c00">④ 帧在收但库没前进</span></td>
+                <td>K 线的缓冲是<b>取走即删</b>（换出时在一个 MULTI 里 <code>HGETALL</code>+<code>DEL</code>），落库成功后它本来就该是空的 —— 所以「缓冲空」是正常态，不像上面几组那样意味着刷盘丢失。
+                    这一条说的是<b>缓冲空 + 库也不前进 + 帧还在收</b>：查 flusher 卡片的 <code>K线 近10s落库</code> 是不是恒 0（恒 0 = K 线刷盘那一路没跑），以及 <code>runtime/log</code> 里的「K线缓冲写入失败 / 换出失败」。</td></tr>
+            <tr><td colspan="2" class="color-desc">另外：K 线只探 <b>60s</b> 一个周期（六个周期共用同一条落库通道，60s 更新最频繁、最先反映卡顿）；「值对比」列对 K 线不适用，恒显示 <code>- / -</code>；K 线也没有 REST 兜底埋点（补数走 <code>market:kline_backfill</code>，兜底埋点只有 <code>market:price_fallback</code> 给最新价/标记价格打）。</td></tr>
+            </tbody>
+        </table>
+
+    </div>
+</div>
+
+<script>
+    // 与 market_monitor 页统一走 layui.util.escape，不再各页抄一份 ——
+    // 安全相关代码有两份拷贝，等于将来补 XSS 只会补到一半
+    var mpEsc = function (s) { return layui.util.escape(s == null ? '' : s); };
+
+    // layui-badge 是定高不换行的小胶囊，判定文案很长会被截断看不全。
+    // 改成：颜色点 + 正常文本，文本可换行；颜色仍然承担"一眼看出严重度"的作用
+    function mpBadge(level, text) {
+        var color = level === 'bad' ? '#c00' : (level === 'warn' ? '#c47100' : '#2e6b4f');
+        return '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;'
+             + 'background:' + color + ';margin-right:6px;vertical-align:middle"></span>'
+             + '<span style="color:' + color + ';white-space:normal;word-break:break-word">'
+             + mpEsc(text) + '</span>';
+    }
+
+    function mpAge(at, age) {
+        if (at === '-') return '<span class="color-desc">-</span>';
+        return mpEsc(at) + ' <span class="color-desc font-s12">(' + (age == null ? '?' : age) + 's)</span>';
+    }
+
+    // 热层原始 hash 下钻。表格里那几列只给时间戳，分不出「这个 field 压根不存在」和
+    // 「field 在、只是值旧」—— 前者才是真的没写进去，后者是上游没更新。点 source_key 看原始 hash
+    function mpHot(sk) {
+        fetch('{:url("hot")}?source_key=' + encodeURIComponent(sk),
+              {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                if (res.code !== 1) { layer.msg(res.info || '读取失败'); return; }
+                var d = res.data, html;
+                if (!d.exists) {
+                    html = '<div class="padding-20" style="color:#c00">'
+                         + 'Redis 热层里<b>没有</b> market:hot:md:' + mpEsc(d.source_key) + ' 这个 key。'
+                         + '<br>说明这一路从来没写进过热层 —— 不是「写了没刷」，是「压根没写」。'
+                         + '</div>';
+                } else {
+                    html = '<div class="padding-10">'
+                         + '<div class="margin-bottom-10 color-desc">market:hot:md:' + mpEsc(d.source_key)
+                         + '　脏集合：' + (d.dirty ? '<b>在</b>（等待刷盘）' : '不在') + '</div>'
+                         + '<table class="layui-table" lay-size="sm"><thead><tr>'
+                         + '<th>字段</th><th>值</th><th>时间</th></tr></thead><tbody>'
+                         + d.rows.map(function (x) {
+                             return '<tr><td>' + mpEsc(x.field) + '</td><td>' + mpEsc(x.value) + '</td>'
+                                  + '<td class="color-desc">' + mpEsc(x.time) + '</td></tr>';
+                           }).join('')
+                         + '</tbody></table></div>';
+                }
+                layer.open({type: 1, title: '热层原始数据 · ' + mpEsc(sk),
+                            area: ['620px', '70%'], content: html});
+            });
+    }
+
+    function mpLoad() {
+        var qs = 'keyword=' + encodeURIComponent(document.getElementById('mp-kw').value)
+            + '&group=' + encodeURIComponent(document.getElementById('mp-group').value)
+            + '&only_bad=' + encodeURIComponent(document.getElementById('mp-onlybad').value);
+
+        fetch('{:url("data")}?' + qs, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                if (res.code !== 1) { return; }
+                var d = res.data, tb = document.getElementById('mp-rows');
+
+                document.getElementById('mp-updated').textContent =
+                    '更新于 ' + d.now + ' · 来源 scope=' + d.scope;
+
+                var f = d.flusher || {};
+                var dirty = parseInt(f.dirty_md != null ? f.dirty_md : -1, 10);
+                var fail = parseInt(f.flush_fail || 0, 10);
+                // K 线自 2026-08-28 起也由本进程落库（缓冲从三个采集/订阅进程搬到 Redis）。
+                // kPend 两个 tag 加总；rows 恒 0 而 pending>0 就是 K 线刷盘那一路没在跑
+                var kPend = ['kline_pending_src', 'kline_pending_pair']
+                    .reduce(function (s, k) { return s + (parseInt(f[k] || 0, 10) || 0); }, 0);
+                var kRows = parseInt(f.kline_rows_10s || 0, 10);
+                var kStuck = kPend > 500 && kRows === 0;
+                document.getElementById('mp-flusher').innerHTML = Object.keys(f).length
+                    ? '<div class="layui-elem-quote' + ((fail > 0 || dirty > 500 || kStuck) ? ' layui-quote-nm' : '') + '">'
+                    + '<b>MarketDbFlusher</b>　脏集合 md=' + mpEsc(f.dirty_md) + ' pair=' + mpEsc(f.dirty_pair)
+                    + '　近10s落库 md=' + mpEsc(f.md_10s) + ' pair=' + mpEsc(f.pair_10s)
+                    + '　单轮耗时 avg=' + mpEsc(f.flush_ms_avg) + 'ms max=' + mpEsc(f.flush_ms_max) + 'ms'
+                    + '　<b style="color:' + (fail > 0 ? '#c00' : 'inherit') + '">写失败=' + fail + '</b>'
+                    + '　interval=' + mpEsc(f.interval) + 's'
+                    + '<br><b>K线</b>　缓冲积压 src=' + mpEsc(f.kline_pending_src)
+                    + ' pair=' + mpEsc(f.kline_pending_pair)
+                    + '　近10s落库 ' + mpEsc(f.kline_rows_10s) + ' 行'
+                    + '　单轮耗时 avg=' + mpEsc(f.kline_ms_avg) + 'ms max=' + mpEsc(f.kline_ms_max) + 'ms'
+                    + (fail > 0 ? '　<span style="color:#c00">写失败 &gt;0：有整轮被回滚过，那批 key 已放回脏集合重试</span>' : '')
+                    + (kStuck ? '<br><span style="color:#c00">K线缓冲积压 ' + kPend + ' 行但近10s一行都没落 —— 刷盘那一路没在跑，查日志「K线缓冲写入失败/换出失败」</span>' : '')
+                    + '</div>'
+                    : '<div class="layui-elem-quote" style="color:#c00">'
+                    + '<b>MarketDbFlusher 没有上报任何指标</b> —— 它可能没在运行。'
+                    + '执行 <code>php think market:db_flush restart -d</code></div>';
+
+                if (!d.rows.length) {
+                    tb.innerHTML = '<tr><td colspan="9" class="text-center color-desc">没有匹配的记录</td></tr>';
+                    return;
+                }
+                tb.innerHTML = d.rows.map(function (r) {
+                    return '<tr>'
+                        + '<td><a href="javascript:;" class="mp-sk" data-sk="' + mpEsc(r.source_key) + '">'
+                        + mpEsc(r.source_key) + '</a></td>'
+                        + '<td>' + mpEsc(r.group) + '</td>'
+                        + '<td>' + mpAge(r.recv_at, r.recv_age) + '</td>'
+                        + '<td>' + (r.fallback_at
+                            ? '<span style="color:#c00">' + mpAge(r.fallback_at, r.fallback_age) + '</span>'
+                            : '<span class="color-desc">-</span>') + '</td>'
+                        + '<td>' + mpAge(r.hot_at, r.hot_age) + '</td>'
+                        + '<td>' + (r.dirty ? '<span class="layui-badge layui-bg-blue">在</span>' : '<span class="color-desc">否</span>') + '</td>'
+                        + '<td>' + mpAge(r.db_at, r.db_age) + '</td>'
+                        + '<td>' + (r.lag_ms == null ? '-' : (r.lag_ms > 0 ? '<b>' + r.lag_ms + 'ms</b>' : '0')) + '</td>'
+                        + '<td>' + (r.val_diff
+                            ? '<span style="color:#c00">' + mpEsc(r.hot_val) + '</span> / ' + mpEsc(r.db_val)
+                            : '<span class="color-desc">' + mpEsc(r.hot_val) + ' / ' + mpEsc(r.db_val) + '</span>') + '</td>'
+                        + '<td>' + mpBadge(r.level, r.verdict) + '</td>'
+                        + '</tr>';
+                }).join('');
+
+                // 事件委托：避免在 onclick 属性里拼字符串（那层嵌套转义很容易出逃逸）
+                tb.querySelectorAll('a.mp-sk').forEach(function (a) {
+                    a.addEventListener('click', function () { mpHot(a.getAttribute('data-sk')); });
+                });
+            });
+    }
+
+    // 进页面就按默认条件（只看异常）查一次 —— 打开这一页就是为了排查，不该还要再点一下。
+    //
+    // ⚠️ 必须直接调，不能挂 DOMContentLoaded：ThinkAdmin 走 PJAX，页面内容是被注入到
+    // **已经存在**的文档里的，DOMContentLoaded 在框架首屏时早就触发过了、不会再触发第二次，
+    // 于是那个监听器永远不执行 —— 表现就是"进页面空白，手点查询才有数据"。
+    // 本脚本是随内容一起注入并立即执行的，此时上面的 DOM 已就位，直接调用即可
+    //（market_monitor/index.html 末尾的 load() 用的也是同一套写法）。
+    //
+    // 仍然不做轮询：这一页要查 MySQL，常驻刷新会变成负载源。
+    mpLoad();
+</script>
+{/block}

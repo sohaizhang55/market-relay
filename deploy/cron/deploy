@@ -1,0 +1,9 @@
+# 启动队列
+# ⚠️ 必须留错误日志：后台通知（AdminNoticeService::notifyAllAdmins）的落库是丢给
+#    这个队列做的 —— 队列不跑，管理员就收不到站内通知，而发送方那一侧看起来完全正常。
+#    原来这一行没有重定向，启动失败只会进 cron 邮件。
+* * * * * php /home/deploy/market-relay/root/think xadmin:queue start >> /dev/null 2>> /home/deploy/market-relay/logs/queue_err.log
+# 备份数据库
+# 脚本自己会在失败时发告警（alert:notify），这里再留一份本机日志兜底 ——
+# 告警通道也可能是坏的那一个
+0 */6 * * * bash /home/deploy/market-relay/deploy/backup/mysql.sh >> /home/deploy/market-relay/logs/backup.log 2>&1

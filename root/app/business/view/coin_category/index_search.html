@@ -1,0 +1,25 @@
+<fieldset>
+    <legend>{:lang('条件搜索')}</legend>
+    <form class="layui-form layui-form-pane form-search" action="{:sysuri()}" onsubmit="return false" method="get" autocomplete="off">
+        <div class="layui-form-item layui-inline">
+            <label class="layui-form-label">{:lang('类型信息')}</label>
+            <div class="layui-input-inline">
+                <input name="name" value="{$get.name|default=''}" placeholder="{:lang('请输入类型标题或代码')}" class="layui-input">
+            </div>
+        </div>
+        <div class="layui-form-item layui-inline">
+            <label class="layui-form-label">{:lang('前端显示')}</label>
+            <div class="layui-input-inline">
+                <select class="layui-select" name="status">
+                    <option value=''>-- {:lang('全部')} --</option>
+                    {foreach $statusList as $k=>$v}
+                    <option value="{$k}" {if input('status') eq "$k"}selected{/if}>{$v}</option>
+                    {/foreach}
+                </select>
+            </div>
+        </div>
+        <div class="layui-form-item layui-inline">
+            <button class="layui-btn layui-btn-primary"><i class="layui-icon">&#xe615;</i> {:lang('搜 索')}</button>
+        </div>
+    </form>
+</fieldset>

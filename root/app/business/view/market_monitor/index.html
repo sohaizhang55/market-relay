@@ -1,0 +1,423 @@
+{extend name="../../admin/view/main"}
+
+{block name="content"}
+<style>
+    /* 进程卡片用 Grid 而不是 layui 的浮动栅格：
+       浮动布局下矮卡片后面跟高卡片会卡住换行，每次刷新数据长短一变排版就跟着变。
+       Grid 的列数只由宽度决定、同一行自动等高，位置因此是稳定的
+       （worker 列表在控制器里已按 name 排序，见 MarketMonitor::buildWorkers）。 */
+    .mm-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); align-items: stretch; }
+    .mm-card { display: flex; flex-direction: column; margin: 0; }
+    .mm-card .layui-card-body { flex: 1; }          /* 内容少的卡片也撑满，不塌陷 */
+    .mm-card .layui-table { margin: 0; }
+</style>
+<div class="layui-card">
+    <div class="layui-card-header">
+        行情链路监控
+        <span class="color-desc font-s12">
+            每 {$refresh} 秒自动刷新 · 只读 Redis，不查询数据库
+        </span>
+        <div class="pull-right">
+            <span id="mm-updated" class="color-desc font-s12"></span>
+        </div>
+    </div>
+    <div class="layui-card-body">
+
+        <!-- 告警条：落库写失败放最前面；订阅方连接级告警（缓冲满 / 积压断开）在「分发监控」页 -->
+        <div id="mm-alerts" class="margin-bottom-15"></div>
+
+        <!-- 危险操作 -->
+        <fieldset class="layui-elem-field layui-field-title">
+            <legend>维护操作</legend>
+        </fieldset>
+        <div class="layui-form-item">
+            {foreach $resettable as $key => $grp}
+            <button class="layui-btn layui-btn-danger layui-btn-sm mm-reset" data-group="{$key}">
+                清理：{$grp.label}
+            </button>
+            {/foreach}
+            <div class="help-block color-desc">
+                按 key 前缀白名单清理，不会执行 FLUSHDB，也不会碰业务数据。每次操作都会记录管理员 UID 与变更前后规模。
+            </div>
+        </div>
+
+        <!-- Worker 现场 -->
+        <fieldset class="layui-elem-field layui-field-title">
+            <legend>
+                行情进程
+                <span class="color-desc font-s12">
+                    分发进程见 <a data-open="{:url('dispatch_monitor/index')}">分发监控</a>
+                    · <a data-open="{:url('go_dispatch_monitor/index')}">Go 分发监控</a>
+                </span>
+            </legend>
+        </fieldset>
+        <div id="mm-workers" class="mm-grid"></div>
+
+        <!-- Redis 结构 -->
+        <fieldset class="layui-elem-field layui-field-title">
+            <legend>
+                Redis 结构
+                <span class="color-desc font-s12">
+                    「待发脏字段」持续偏高说明分发机没跟上
+                </span>
+            </legend>
+        </fieldset>
+        <table class="layui-table" lay-size="sm">
+            <thead><tr><th>用途</th><th>Key</th><th>类型</th><th>元素数</th><th>内存</th></tr></thead>
+            <tbody id="mm-redis"></tbody>
+        </table>
+
+        <!-- 数据组新鲜度 -->
+        <fieldset class="layui-elem-field layui-field-title">
+            <legend>
+                数据组新鲜度
+                <span class="color-desc font-s12">
+                    三列并排看：采集有、分发无 = 采集器没发布；分发有、落库无 = 分发链路丢了。
+                    距今超过 {$staleSeconds} 秒标红
+                </span>
+            </legend>
+        </fieldset>
+        <div class="margin-bottom-10">
+            <!-- 三个下拉的选项都由实际数据生成（见 syncOptions），不写死 ——
+                 写死的清单迟早会和真实频道/周期对不上，而对不上的筛选器比没有筛选器更糟 -->
+            <span class="color-desc font-s12">交易对</span>
+            <select id="mm-f-sk" class="layui-input inline-block" style="width:210px"></select>
+            <span class="color-desc font-s12 margin-left-10">频道</span>
+            <select id="mm-f-chan" class="layui-input inline-block" style="width:140px"></select>
+            <span class="color-desc font-s12 margin-left-10">周期</span>
+            <select id="mm-f-period" class="layui-input inline-block" style="width:130px"></select>
+            <button id="mm-f-reset" class="layui-btn layui-btn-primary layui-btn-sm margin-left-10">重置</button>
+            <span id="mm-f-count" class="color-desc font-s12 margin-left-10"></span>
+        </div>
+        <div style="max-height:520px;overflow:auto">
+            <table class="layui-table" lay-size="sm">
+                <thead>
+                <tr>
+                    <th title="采集/落库按 source_key，分发按 pair（{symbol_code}_{type}）">数据组</th><th>频道</th><th>周期</th>
+                    <th>采集 距今/速率·时刻</th><th>分发 距今/速率·时刻</th><th>落库 距今/速率·时刻</th>
+                </tr>
+                </thead>
+                <tbody id="mm-groups"></tbody>
+            </table>
+        </div>
+
+        <!-- 事件流水 -->
+        <fieldset class="layui-elem-field layui-field-title">
+            <legend>事件流水 <span class="color-desc font-s12">订阅方的连接、降级、缓冲满、断开见「分发监控」页</span></legend>
+        </fieldset>
+        <div style="max-height:260px;overflow:auto">
+            <table class="layui-table" lay-size="sm">
+                <thead><tr><th style="width:200px">时间</th><th style="width:170px">类型</th><th>内容</th></tr></thead>
+                <tbody id="mm-events"></tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
+
+<script>
+(function () {
+    var REFRESH = {$refresh} * 1000;
+    var STALE = {$staleSeconds};
+    // 三个精确筛选条件。'' = 全部；周期用 NO_PERIOD 表示"非 K 线"(suffix 为空)，
+    // 这跟"全部"是两回事，不能都用 '' 表示
+    var NO_PERIOD = '\u0000none';
+    var groupFilter = { source_key: '', channel: '', period: '' };
+
+    // 用 layui 自带的转义，不再各页抄一份：这是安全相关代码，两份拷贝意味着
+    // 将来补 XSS 只会补到其中一半。layui.util 在 admin.js 里已被使用，全局可用。
+    // 顺带比原来那份更严：它连单引号也转义（原实现只转 & < > "）
+    var esc = function (s) { return layui.util.escape(s === null || s === undefined ? '' : s); };
+    function bytes(n) {
+        if (n === null || n === undefined) return '-';
+        if (n >= 1048576) return (n/1048576).toFixed(1) + ' MB';
+        if (n >= 1024) return (n/1024).toFixed(1) + ' KB';
+        return n + ' B';
+    }
+    // 距今多久 + 是否过期。这一列是"数据是不是断了"的直接答案。
+    // 第二行给绝对时刻：光看"距今 92s"不知道停在哪一刻，跟日志和另一台机器对不上；
+    // 时刻是服务端格式化好的，不受浏览器时区影响
+    function ageCell(m) {
+        if (!m || m.age_sec === null) return '<span class="color-desc">—</span>';
+        var cls = m.age_sec > STALE ? 'color-red' : (m.age_sec > STALE/2 ? 'color-orange' : 'color-green');
+        return '<span class="' + cls + '">' + m.age_sec + 's</span>'
+             + ' <span class="color-desc font-s12">/ ' + m.rate + '&nbsp;次/s</span>'
+             + '<br><span class="color-desc font-s12">' + esc(m.last_at || '—') + '</span>';
+    }
+
+    function renderAlerts(d) {
+        var html = '<div class="layui-elem-quote layui-quote-nm color-green">最近 5 分钟无落库写失败。</div>';
+        if (d.alerts.db_flush_fail_300s > 0) {
+            html = '<div class="layui-elem-quote" style="border-left-color:#c00">'
+                 + '最近 5 分钟内落库写失败 <b>' + d.alerts.db_flush_fail_300s + '</b> 次。'
+                 + '受影响的 key 已放回脏集合重试，但只要这个数不回到 0，'
+                 + '库里的值就和 Redis 热层不一致 —— 去「落库链路诊断」页按 source_key 查具体是哪几条。'
+                 + '</div>';
+        }
+        document.getElementById('mm-alerts').innerHTML = html;
+    }
+
+    // 进程现场：PID / 启动时刻 / 已运行多久 / 内存。
+    // 排查时第一个要分清的就是「一直如此」还是「刚重启之后才如此」——
+    // 一个刚起来 30 秒的进程报的错，和一个跑了三天的进程报的错，方向完全不同。
+    // 内存单调上涨则是常驻进程最该盯的泄漏信号。
+    function procLine(w) {
+        if (!w.pid) return '';
+        var mem  = w.mem ? bytes(Number(w.mem)) : '—';
+        var peak = w.mem_peak ? bytes(Number(w.mem_peak)) : '—';
+        // 刚重启的进程单独标一下：这段时间很多指标还没攒够一个统计窗口，别急着下结论
+        var fresh = (w.uptime_sec > 0 && w.uptime_sec < 60)
+            ? ' <span class="layui-badge layui-bg-orange">刚启动</span>' : '';
+        return '<div class="color-desc font-s12 margin-top-5" style="line-height:1.7">'
+             + 'PID ' + esc(w.pid) + '　已运行 <b>' + esc(w.uptime_text) + '</b>' + fresh
+             + '<br>启动于 ' + esc(w.boot_at) + '　内存 ' + mem + '（峰值 ' + peak + '）'
+             + '</div>';
+    }
+
+    function renderWorkers(list) {
+        if (!list.length) {
+            document.getElementById('mm-workers').innerHTML =
+                '<div class="color-desc">未发现行情相关进程（采集器 / 落库等进程均未上报指标）</div>';
+            return;
+        }
+        var html = list.map(function (w) {
+            var m = w.metrics || {};
+            // 健康判定优先于"存活"：进程在跑但已经卡死/在丢包，比进程没了更容易被忽略
+            var h = w.health || { level: 'ok', text: '正常', reason: '' };
+            var badgeCls = { crit: 'layui-bg-red', warn: 'layui-bg-orange',
+                             info: 'layui-bg-gray', ok: 'layui-bg-green' }[h.level] || 'layui-bg-green';
+            var badge = '<span class="layui-badge ' + badgeCls + '">' + esc(h.text) + '</span>';
+            // 从没启动过的进程谈不上"心跳过期" —— 那个标签会让人以为它跑过又断了，
+            // 从而去查日志找崩溃原因，而实际上它一次都没起来过
+            if (w.missing) badge += ' <span class="layui-badge layui-bg-red">该跑却没跑</span>';
+            else if (!w.alive) badge += ' <span class="layui-badge layui-bg-gray">心跳过期</span>';
+            var rows = [];
+            if (m.busy_pct !== undefined) {
+                // 颜色由 Controller 给（w.busy_color），阈值常量在 MarketMetrics，
+                // 与常驻进程的 stat 日志共用同一组值 ——
+                // 这里曾经自己写 60/30，与判定的 80/50 不一致，页面会自相矛盾
+                var bcol = w.busy_level === 'ok' ? '' : w.busy_color;
+                // 分桶明细跟在总数后面：只给总数只能说明"忙"，说不出"忙在哪"，
+                // 而后者才是这个指标真正要回答的问题（见 EventLoopBusyTrait 注释）
+                var detail = (m.busy_detail && String(m.busy_detail).trim() !== '')
+                    ? '<div class="color-desc font-s12" style="word-break:break-all">'
+                      + esc(m.busy_detail) + '</div>'
+                    : '';
+                rows.push(['事件循环占用',
+                    '<span class="' + bcol + '">' + esc(m.busy_pct) + ' %</span>' + detail]);
+            }
+            if (m.symbol_count !== undefined)rows.push(['采集交易对', m.symbol_count]);
+            // 成交窗口合并是活跃交易对上的**结构性常态**，不是故障 —— 灰色说明而不是红色数字。
+            // 文案由 Controller 的 tradeOverflowNote() 生成（Coding_Standards §10），
+            // 这里只负责渲染，不做阈值判断也不拼措辞
+            if (w.trade_overflow_note)
+                rows.push(['成交窗口合并',
+                    '<div class="color-desc font-s12" style="word-break:break-all">'
+                    + esc(w.trade_overflow_note) + '</div>']);
+
+            // 判定理由单独占一行，且给出下一步而不只是陈述现象
+            var reasonCls = { crit: 'color-red', warn: 'color-orange',
+                              info: 'color-desc', ok: 'color-green' }[h.level] || 'color-desc';
+            var reason = h.reason
+                ? '<div class="' + reasonCls + ' font-s12 margin-bottom-10" style="line-height:1.6">'
+                  + esc(h.reason) + '</div>'
+                : '';
+
+            return '<div class="layui-card mm-card">'
+                 + '<div class="layui-card-header">' + esc(w.name) + ' ' + badge
+                 + '</div><div class="layui-card-body">'
+                 + reason
+                 + '<table class="layui-table" lay-size="sm"><tbody>'
+                 + rows.map(function (r) { return '<tr><td class="color-desc" style="width:110px">' + r[0] + '</td><td>' + r[1] + '</td></tr>'; }).join('')
+                 + '</tbody></table>'
+                 + procLine(w)
+                 + '<div class="color-desc font-s12 margin-top-5">指标更新于 ' + (w.metric_age === null ? '—' : w.metric_age + 's 前') + '</div>'
+                 + '</div></div>';
+        }).join('');
+        document.getElementById('mm-workers').innerHTML = html;
+    }
+
+    function renderRedis(list) {
+        document.getElementById('mm-redis').innerHTML = list.map(function (r) {
+            return '<tr><td>' + esc(r.label) + '</td><td><code>' + esc(r.key) + '</code></td>'
+                 + '<td>' + esc(r.type) + '</td><td>' + (r.size < 0 ? '—' : r.size) + '</td>'
+                 + '<td>' + bytes(r.memory) + '</td></tr>';
+        }).join('');
+    }
+
+    // 最近一次拿到的完整数据组列表。切换下拉时直接用它重画，不必等下一轮请求
+    var lastGroups = null;
+
+    /**
+     * 用全量数据刷新三个下拉的选项。
+     *
+     * ⚠️ 两个必须守住的点：
+     *  1. **只在选项集合真的变了时才重建 <option>**。这一页每 3 秒轮询一次，
+     *     每轮都无脑重建的话，正展开的下拉会被关掉、选中项也会被冲掉，根本没法用。
+     *  2. 选中值在重建后要**显式恢复**。若该值已经不存在于新数据里（比如交易对下架了），
+     *     就退回"全部"并同步内部状态，否则筛选条件会指向一个永远匹配不到的值，
+     *     表现是"表格一直空的且看不出为什么"。
+     */
+    function syncOptions(list) {
+        var sk = [], chan = [], period = [];
+        list.forEach(function (g) {
+            if (g.source_key && sk.indexOf(g.source_key) < 0) sk.push(g.source_key);
+            if (g.channel && chan.indexOf(g.channel) < 0) chan.push(g.channel);
+            var p = g.suffix ? String(g.suffix) : NO_PERIOD;
+            if (period.indexOf(p) < 0) period.push(p);
+        });
+        sk.sort();
+        chan.sort();
+        // 周期按数值排；NO_PERIOD 永远排最后
+        period.sort(function (a, b) {
+            if (a === NO_PERIOD) return 1;
+            if (b === NO_PERIOD) return -1;
+            return Number(a) - Number(b);
+        });
+
+        fillSelect('mm-f-sk', sk, '全部交易对', 'source_key', function (v) { return v; });
+        fillSelect('mm-f-chan', chan, '全部频道', 'channel', function (v) { return v; });
+        fillSelect('mm-f-period', period, '全部周期', 'period', function (v) {
+            return v === NO_PERIOD ? '无（非 K 线）' : v + 's';
+        });
+    }
+
+    function fillSelect(id, values, allLabel, filterKey, labelOf) {
+        var el = document.getElementById(id);
+        if (!el) return;
+
+        // 选项集合没变就什么都不做 —— 见 syncOptions 注释第 1 点
+        var sig = values.join('\u0001');
+        if (el.dataset.sig === sig) return;
+        el.dataset.sig = sig;
+
+        var want = groupFilter[filterKey];
+        var html = '<option value="">' + allLabel + '</option>';
+        values.forEach(function (v) {
+            html += '<option value="' + esc(v) + '">' + esc(labelOf(v)) + '</option>';
+        });
+        el.innerHTML = html;
+
+        // 恢复选中；选中的值已经不在新数据里就退回"全部"
+        if (want && values.indexOf(want) >= 0) {
+            el.value = want;
+        } else {
+            el.value = '';
+            groupFilter[filterKey] = '';
+        }
+    }
+
+    function renderGroups(list) {
+        lastGroups = list;
+
+        // 先按**全量**数据刷新下拉选项，再过滤 —— 顺序不能反：
+        // 若用当前筛选后的结果去生成选项，选中某个交易对之后其他选项就消失了，再也切不回去
+        syncOptions(list);
+
+        var rows = list.filter(function (g) {
+            if (groupFilter.source_key && g.source_key !== groupFilter.source_key) return false;
+            if (groupFilter.channel && g.channel !== groupFilter.channel) return false;
+            if (groupFilter.period) {
+                var p = g.suffix ? String(g.suffix) : NO_PERIOD;
+                if (p !== groupFilter.period) return false;
+            }
+            return true;
+        });
+
+        var cnt = document.getElementById('mm-f-count');
+        if (cnt) cnt.textContent = rows.length === list.length
+            ? ('共 ' + list.length + ' 组')
+            : ('匹配 ' + rows.length + ' / ' + list.length + ' 组');
+
+        if (!rows.length) {
+            document.getElementById('mm-groups').innerHTML =
+                '<tr><td colspan="6" class="color-desc">无匹配的数据组</td></tr>';
+            return;
+        }
+        document.getElementById('mm-groups').innerHTML = rows.map(function (g) {
+            return '<tr><td>' + esc(g.source_key) + '</td><td>' + esc(g.channel) + '</td>'
+                 + '<td>' + (g.suffix ? esc(g.suffix) + 's' : '—') + '</td>'
+                 + '<td>' + ageCell(g.collect) + '</td>'
+                 + '<td>' + ageCell(g.dispatch) + '</td>'
+                 + '<td>' + ageCell(g.land) + '</td></tr>';
+        }).join('');
+    }
+
+    // 事件时间戳：YYYY-MM-DD HH:mm:ss.mmm
+    //
+    // 不用 toLocaleTimeString()：它只给时间不给日期，而事件流水保留 500 条、
+    // 冷清时能横跨好几天 —— 只看 19:41:16 分不出是刚发生的还是前天的。
+    // 它还受浏览器语言环境影响，某些 locale 会渲染成 "7:41:16 PM"。
+    // 时区是**浏览器本地**（ts 是 Unix 毫秒），不是分发机的时区。
+    function fmtTs(ms) {
+        var d = new Date(ms), p = function (n, w) { return String(n).padStart(w || 2, '0'); };
+        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())
+             + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds())
+             + '.' + p(d.getMilliseconds(), 3);
+    }
+
+    function renderEvents(list) {
+        if (!list.length) {
+            document.getElementById('mm-events').innerHTML =
+                '<tr><td colspan="3" class="color-desc">暂无事件</td></tr>';
+            return;
+        }
+        document.getElementById('mm-events').innerHTML = list.map(function (e) {
+            var t = fmtTs(e.ts);
+            var cls = e.type === 'buffer_full' ? 'color-red'
+                    : (e.type === 'subscriber_lag_close' ? 'color-orange' : 'color-desc');
+            return '<tr><td>' + t + '</td><td class="' + cls + '">' + esc(e.type) + '</td>'
+                 + '<td class="color-desc">' + esc(e.msg) + '</td></tr>';
+        }).join('');
+    }
+
+    function load() {
+        $.get('{:url("data")}', function (res) {
+            if (res.code !== 1) return;
+            var d = res.data;
+            renderAlerts(d);
+            renderWorkers(d.workers);
+            renderRedis(d.redis);
+            renderGroups(d.groups);
+            renderEvents(d.events);
+            document.getElementById('mm-updated').innerText =
+                '更新于 ' + new Date(d.now_ms).toLocaleTimeString();
+        }, 'json');
+    }
+
+    // 下拉改变后立刻重画，不等下一次 3 秒轮询 —— 否则点完要愣一下才有反应
+    [['mm-f-sk', 'source_key'], ['mm-f-chan', 'channel'], ['mm-f-period', 'period']]
+        .forEach(function (pair) {
+            document.getElementById(pair[0]).addEventListener('change', function (e) {
+                groupFilter[pair[1]] = e.target.value;
+                if (lastGroups) renderGroups(lastGroups);
+            });
+        });
+
+    document.getElementById('mm-f-reset').addEventListener('click', function (e) {
+        e.preventDefault();
+        groupFilter = { source_key: '', channel: '', period: '' };
+        ['mm-f-sk', 'mm-f-chan', 'mm-f-period'].forEach(function (id) {
+            document.getElementById(id).value = '';
+        });
+        if (lastGroups) renderGroups(lastGroups);
+    });
+
+    $('body').on('click', '.mm-reset', function () {
+        var group = $(this).data('group');
+        var label = $(this).text().trim();
+        layer.confirm('确认执行「' + label + '」？此操作会立即删除对应的 Redis 键，且会被记入审计日志。',
+            { title: '危险操作', icon: 3 }, function (idx) {
+                layer.close(idx);
+                $.post('{:url("reset")}', { group: group }, function (res) {
+                    layer.msg(res.info, { icon: res.code === 1 ? 1 : 2 });
+                    load();
+                }, 'json');
+            });
+    });
+
+    load();
+    setInterval(load, REFRESH);
+})();
+</script>
+{/block}

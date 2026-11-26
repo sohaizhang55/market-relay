@@ -1,0 +1,31 @@
+{extend name='../../admin/view/table'}
+
+{block name="content"}
+<div class="layui-tab layui-tab-card table-block">
+    <div class="layui-tab-content table-content">
+        {include file='market/source_kline_search'}
+        <table id="SourceKlineTable" data-url="{:sysuri('source_kline')}" data-target-search="form.form-search"></table>
+    </div>
+</div>
+
+<script>
+    $(function () {
+        $('#SourceKlineTable').layTable({
+            even: true, height: 'full',
+            sort: { field: 'id', type: 'desc' },
+            cols: [[
+                { field: 'id', title: 'ID', width: 80, align: 'center', sort: true },
+                { field: 'source_key', title: '内部编码', width: 200, align: 'center' },
+                { field: 'period_text', title: '周期', width: 100, align: 'center' },
+                { field: 'origin_text', title: '来源', width: 130, align: 'center', templet: '<div><span class="{{d.origin_color}}">{{d.origin_text}}</span></div>' },
+                { field: 'open', title: '开盘', width: 160, align: 'right' },
+                { field: 'close', title: '收盘', width: 160, align: 'right' },
+                { field: 'high', title: '最高', width: 170, align: 'right' },
+                { field: 'low', title: '最低', width: 170, align: 'right' },
+                { field: 'ts_text', title: '时间', width: 180, align: 'center' }
+            ]]
+        });
+    });
+</script>
+
+{/block}

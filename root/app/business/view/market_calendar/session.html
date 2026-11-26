@@ -1,0 +1,92 @@
+{extend name='../../admin/view/table'}
+
+{block name="button"}
+{if auth("session_add")}
+<button data-modal='{:url("session_add")}' data-title="{:lang('添加开市时段')}"
+    class='layui-btn layui-btn-sm layui-btn-primary'>{:lang('添加开市时段')}</button>
+{/if}
+{/block}
+
+{block name="content"}
+<div class="layui-tab layui-tab-card">
+    <div class="layui-tab-content">
+        {include file='market_calendar/session_search'}
+        <table id="SessionTable" data-url="{:sysuri('session')}" data-target-search="form.form-search"></table>
+    </div>
+</div>
+{/block}
+
+{block name='script'}
+<script>
+    $(function () {
+        $('#SessionTable').layTable({
+            even: true, height: 'full',
+            cols: [[
+                { field: 'calendar_text', title: '{:lang("交易日历")}', minWidth: 180, align: 'center', templet: '#CalendarTpl' },
+                { field: 'timezone_text', title: '{:lang("时区")}', minWidth: 150, align: 'center' },
+                { field: 'open_text', title: '{:lang("开市")}', minWidth: 120, align: 'center' },
+                { field: 'close_text', title: '{:lang("收市")}', minWidth: 120, align: 'center' },
+                { field: 'cross_text', title: '{:lang("跨天")}', minWidth: 80, align: 'center', templet: '#CrossTpl' },
+                { field: 'duration_text', title: '{:lang("时长")}', minWidth: 100, align: 'center', templet: '#DurationTpl' },
+                { field: 'source', title: '{:lang("数据来源")}', minWidth: 100, align: 'center', templet: '#SourceTpl' },
+                { field: 'status', title: '{:lang("使用状态")}', minWidth: 110, align: 'center', templet: '#StatusSwitchTpl' },
+                { toolbar: '#Toolbar', title: '{:lang("操作面板")}', align: 'center', minWidth: 150, fixed: 'right' }
+            ]]
+        });
+
+        // 状态切换 (1=启用, 2=停用)
+        layui.form.on('switch(StatusSwitch)', function (obj) {
+            var data = { id: obj.value, status: obj.elem.checked ? 1 : 2 };
+            $.form.load("{:url('session_state')}", data, 'post', function (ret) {
+                if (ret.code < 1) $.msg.error(ret.info, 3, function () {
+                    $('#SessionTable').trigger('reload');
+                }); else {
+                    $('#SessionTable').trigger('reload')
+                }
+                return false;
+            }, false);
+        });
+    });
+</script>
+
+<!-- 交易日历：认不出的 MIC 由 Controller 标成红字 + ⚠，那一行永远匹配不上任何标的 -->
+<script type="text/html" id="CalendarTpl">
+    <span class="{{d.calendar_color}}">{{d.calendar_text}}</span>
+</script>
+
+<!-- 跨天段是本表最容易被误删的一类：「周四17:00 到 周五17:00」看着像重复占了两天，
+     实际上它是一个完整交易日，删了那 24 小时就永远判为休市 -->
+<script type="text/html" id="CrossTpl">
+    <span class="{{d.cross_color}}">{{d.cross_text}}</span>
+</script>
+
+<!-- 时长是算出来的，用处是让配错一眼可见：配反或配成零长度时这里直接显示「⚠ 异常」 -->
+<script type="text/html" id="DurationTpl">
+    <span class="{{d.duration_color}}">{{d.duration_text}}</span>
+</script>
+
+<!-- 数据来源：自动导入的行会被 market:import_calendar 重跑覆盖，人工录入的不会 -->
+<script type="text/html" id="SourceTpl">
+    <span class="{{d.source_color}}">{{d.source_text}}</span>
+</script>
+
+<script type="text/html" id="StatusSwitchTpl">
+    {if auth("session_state")}
+    <input type="checkbox" value="{{d.id}}" lay-skin="switch" lay-text="{:lang('已启用')}|{:lang('已停用')}"
+        lay-filter="StatusSwitch" {{-d.status==1?'checked':''}}>
+    {else}
+    {{-d.status==1 ? '<b class="color-green">{:lang("已启用")}</b>' : '<b class="color-red">{:lang("已停用")}</b>'}}
+    {/if}
+</script>
+
+<script type="text/html" id="Toolbar">
+    {if auth("session_add")}
+    <a class="layui-btn layui-btn-sm" data-event-dbclick data-modal='{:url("session_add")}?id={{d.id}}'
+        data-title="{:lang('编辑开市时段')}">{:lang('编 辑')}</a>
+    {/if}
+    {if auth("session_remove")}
+    <a class="layui-btn layui-btn-sm layui-btn-danger" data-confirm="{:lang('确定要删除该时段吗？删掉这段时间会永远判为休市，建议改用停用。')}"
+        data-action='{:url("session_remove")}' data-value="id#{{d.id}}">{:lang('删 除')}</a>
+    {/if}
+</script>
+{/block}

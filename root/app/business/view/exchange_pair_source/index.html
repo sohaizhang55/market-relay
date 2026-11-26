@@ -1,0 +1,86 @@
+{extend name='../../admin/view/table'}
+
+{block name="button"}
+{if auth("add")}
+<button data-modal='{:url("add")}?pair_id={$pairId}' data-title="{:lang('添加数据源')}"
+    class='layui-btn layui-btn-sm layui-btn-primary'>{:lang('添加数据源')}</button>
+{/if}
+{/block}
+
+{block name="content"}
+<div class="layui-tab layui-tab-card">
+    <div class="layui-tab-content">
+        <div style="margin-bottom:10px;font-size:13px" class="color-desc">
+            {:lang('按优先级从小到大，第一个启用的是主源，其余为备源；主备切换时选第一个健康的源。当前在用的源不能停用或删除，要先切走。断流阈值在「原始行情」页按源设置。')}
+        </div>
+        <table id="PairSourceTable" data-url="{:sysuri('index')}?pair_id={$pairId}"></table>
+    </div>
+</div>
+{/block}
+
+{block name='script'}
+<script>
+    $(function () {
+        $('#PairSourceTable').layTable({
+            even: true, height: 'full', page: false,
+            cols: [[
+                { field: 'priority', title: '{:lang("优先级")}', width: 80, align: 'center' },
+                { field: 'role_text', title: '{:lang("角色")}', width: 80, align: 'center', templet: '<div><span class="layui-badge {{d.role_color}}">{{d.role_text}}</span></div>' },
+                { field: 'active_text', title: '{:lang("生效")}', width: 90, align: 'center', templet: '#ActiveTpl' },
+                { field: 'source_key', title: '{:lang("数据源")}', minWidth: 220, templet: '<div><span class="{{d.source_color}}">{{d.source_text}}</span></div>' },
+                { field: 'exchange_text', title: '{:lang("交易所")}', width: 100, align: 'center' },
+                { field: 'type_text', title: '{:lang("类型")}', width: 80, align: 'center' },
+                { field: 'price_fresh_text', title: '{:lang("价格新鲜度")}', width: 110, align: 'center', templet: '<div><span class="{{d.price_fresh_color}}" title="{{d.price_fresh_title}}">{{d.price_fresh_text}}</span> <span class="color-desc">/ {{d.ticker_stale_sec}}s</span></div>' },
+                { field: 'depth_fresh_text', title: '{:lang("深度新鲜度")}', width: 110, align: 'center', templet: '<div><span class="{{d.depth_fresh_color}}" title="{{d.depth_fresh_title}}">{{d.depth_fresh_text}}</span> <span class="color-desc">/ {{d.depth_stale_sec}}s</span></div>' },
+                { field: 'status', title: '{:lang("状态")}', width: 110, align: 'center', templet: '#StatusSwitchTpl' },
+                { field: 'remark', title: '{:lang("备注")}', minWidth: 120 },
+                { toolbar: '#Toolbar', title: '{:lang("操作")}', align: 'center', width: 230, fixed: 'right' }
+            ]]
+        });
+
+        // 状态切换 (1=启用, 2=停用)；当前在用的源停用会被后端拒绝，失败时刷新恢复开关
+        layui.form.on('switch(StatusSwitch)', function (obj) {
+            var data = { id: obj.value, status: obj.elem.checked ? 1 : 2 };
+            $.form.load("{:url('state')}", data, 'post', function (ret) {
+                if (ret.code < 1) $.msg.error(ret.info, 3, function () {
+                    $('#PairSourceTable').trigger('reload');
+                }); else {
+                    $('#PairSourceTable').trigger('reload');
+                }
+                return false;
+            }, false);
+        });
+    });
+</script>
+
+<script type="text/html" id="ActiveTpl">
+    {{# if (d.is_active) { }}<span class="layui-badge layui-bg-green">{{d.active_text}}</span>{{# } }}
+</script>
+
+<script type="text/html" id="StatusSwitchTpl">
+    {if auth("state")}
+    <input type="checkbox" value="{{d.id}}" lay-skin="switch" lay-text="{:lang('已启用')}|{:lang('已停用')}"
+        lay-filter="StatusSwitch" {{-d.status_on?'checked':''}}>
+    {else}
+    {{-d.status_on ? '<b class="color-green">{:lang("已启用")}</b>' : '<b class="color-red">{:lang("已停用")}</b>'}}
+    {/if}
+</script>
+
+<script type="text/html" id="Toolbar">
+    {if auth("activate")}
+    {{# if (!d.is_active && d.status_on) { }}
+    <a class="layui-btn layui-btn-sm layui-btn-normal" data-action='{:url("activate")}' data-value="id#{{d.id}}"
+        data-confirm="{:lang('确定把交易对切到')} {{d.source_key}} {:lang('吗？各采集进程约 3 秒内生效。')}">{:lang('切为生效源')}</a>
+    {{# } }}
+    {/if}
+    {if auth("add")}
+    <a class="layui-btn layui-btn-sm" data-modal='{:url("add")}?id={{d.id}}' data-title="{:lang('编辑数据源')}">{:lang('编辑')}</a>
+    {/if}
+    {if auth("remove")}
+    {{# if (!d.is_active) { }}
+    <a class="layui-btn layui-btn-sm layui-btn-danger" data-action='{:url("remove")}' data-value="id#{{d.id}}"
+        data-confirm="{:lang('确定删除这条绑定吗？')}">{:lang('删除')}</a>
+    {{# } }}
+    {/if}
+</script>
+{/block}

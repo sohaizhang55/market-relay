@@ -1,0 +1,128 @@
+<div class="layui-header">
+    <ul class="layui-nav layui-layout-left">
+        <li class="layui-nav-item" lay-unselect>
+            <a class="text-center" data-target-menu-type>
+                <i class="layui-icon layui-icon-spread-left"></i>
+            </a>
+        </li>
+        <li class="layui-nav-item" lay-unselect>
+            <a class="layui-logo-hide layui-elip" href="{:sysuri('@')}" title="{:sysconf('app_name')}">
+                <span class="headimg headimg-no headimg-xs" data-lazy-src="{:sysconf('site_icon')}"></span>
+            </a>
+        </li>
+        {foreach $menus as $one}
+        <li class="layui-nav-item">
+            <a data-menu-node="m-{$one.id}" data-open="{$one.url}"><span>{$one.title|default=''}</span></a>
+        </li>
+        {/foreach}
+    </ul>
+    <ul class="layui-nav layui-layout-right">
+        <li lay-unselect class="layui-nav-item"
+            style="color:rgba(255,255,255,.7);font-family:monospace;margin-right:10px">
+            <a>
+                <span class="layui-hide-xs" style="margin-right:5px">{:config('app.default_timezone')}</span>
+                <span id="current-time">
+                    {php} echo date("Y-m-d H:i:s" , time()){/php}
+                </span>
+            </a>
+        </li>
+        <li lay-unselect class="layui-nav-item"><a data-reload><i class="layui-icon layui-icon-refresh-3"></i></a></li>
+        {if session('user.username')}
+
+        <li class="layui-nav-item" lay-unselect>
+            <a href="javascript:;" id="f2c-notif-btn" class="layui-badge-box" style="padding:0 14px;line-height:60px;">
+                <i class="layui-icon layui-icon-notice" style="font-size:20px;vertical-align:middle;"></i>
+                <span id="f2c-notif-badge" class="layui-badge layui-badge-red" style="display:none">0</span>
+            </a>
+        </li>
+        <!-- 通知下拉面板 -->
+        <div class="f2c-dropdown" id="f2c-notif-pan">
+            <!-- 头部 -->
+            <div class="f2c-dd-head">
+                <span class="f2c-dd-title"><i class="layui-icon layui-icon-notice"></i> 消息通知</span>
+                <span class="f2c-dd-actions">
+                    <a href="javascript:;" id="f2c-notif-mark-read"
+                        class="layui-btn layui-btn-xs layui-bg-blue">全部已读</a>
+                </span>
+            </div>
+            <!-- 消息列表（JS 动态填充） -->
+            <div class="f2c-dd-content">
+                <div class="f2c-dd-empty"><i class="layui-icon layui-icon-face-smile"
+                        style="font-size:28px;display:block;margin-bottom:6px;opacity:.3"></i>暂无消息</div>
+            </div>
+            <!-- 底部 -->
+            <div class="f2c-dd-foot">
+                <a href="javascript:;" data-open="{:sysuri('business/notification/index')}">查看全部通知 <i
+                        class="layui-icon layui-icon-right" style="font-size:12px"></i></a>
+            </div>
+        </div>
+
+        <!-- ── 待处理铃 ────────────────────────────────────── -->
+        <li class="layui-nav-item" lay-unselect>
+            <a href="javascript:;" id="f2c-pending-btn" class="layui-badge-box"
+                style="padding:0 14px;line-height:60px;">
+                <i class="layui-icon layui-icon-time" style="font-size:20px;vertical-align:middle;"></i>
+                <span id="f2c-pending-badge" class="layui-badge layui-badge-red" style="display:none">0</span>
+            </a>
+        </li>
+        <!-- 待处理下拉面板 -->
+        <div class="f2c-dropdown" id="f2c-pending-pan">
+            <div class="f2c-dd-head">
+                <span class="f2c-dd-title"><i class="layui-icon layui-icon-time"></i> 待处理事项</span>
+                <span id="f2c-pending-total-label" style="font-size:11px;color:#999;"></span>
+            </div>
+            <div class="f2c-dd-content"></div>
+        </div>
+
+        <li class="layui-nav-item">
+            <dl class="layui-nav-child">
+                <dd lay-unselect><a data-modal="{:sysuri('admin/index/info',['id'=>session('user.id')])}"><i
+                            class="layui-icon layui-icon-set-fill"></i> {:lang('基本资料')}</a></dd>
+                <dd lay-unselect><a data-modal="{:sysuri('admin/index/pass',['id'=>session('user.id')])}"><i
+                            class="layui-icon layui-icon-component"></i> {:lang('安全设置')}</a></dd>
+                <dd lay-unselect><a data-modal="{:sysuri('admin/user/google',['id'=>session('user.id')])}"><i
+                            class="layui-icon layui-icon-vercode"></i> {:lang('谷歌二步验证')}</a></dd>
+                {if isset($super) and $super}
+                <dd lay-unselect><a data-load="{:sysuri('admin/api.system/push')}"><i
+                            class="layui-icon layui-icon-template-1"></i> {:lang('缓存加速')}</a></dd>
+                <dd lay-unselect><a data-load="{:sysuri('admin/api.system/clearCache')}"><i
+                            class="layui-icon layui-icon-delete"></i> {:lang('清理运行缓存')}</a></dd>
+                <dd lay-unselect><a data-load="{:sysuri('admin/api.system/clear')}"><i
+                            class="layui-icon layui-icon-fonts-clear"></i> {:lang('清理日志缓存')}</a></dd>
+                {/if}
+                <dd lay-unselect><a data-width="520px" data-modal="{:sysuri('admin/index/theme')}"><i
+                            class="layui-icon layui-icon-theme"></i> {:lang('配色方案')}</a></dd>
+                <dd lay-unselect><a data-load="{:sysuri('admin/login/out')}" data-confirm="{:lang('确定要退出登录吗？')}"><i
+                            class="layui-icon layui-icon-release"></i> {:lang('退出登录')}</a></dd>
+            </dl>
+            <a class="layui-elip">
+                <span class="headimg" data-lazy-src="{:htmlentities(session('user.headimg'))}"></span>
+                <span>{:htmlentities(lang(session('user.nickname')?:session('user.username')))}</span>
+            </a>
+        </li>
+        {else}
+        <li class="layui-nav-item">
+            <a data-href="{:sysuri('admin/login/index')}"><i class="layui-icon layui-icon-username"></i>
+                {:lang('立即登录')}</a>
+        </li>
+        {/if}
+    </ul>
+</div>
+
+<script>
+    function updateTime() {
+        var serverTime = document.getElementById("current-time").innerText;
+        var now = new Date(serverTime.replace(/-/g, '/'));
+        now.setSeconds(now.getSeconds() + 1);
+        var year = now.getFullYear();
+        var month = (now.getMonth() + 1).toString().padStart(2, '0');
+        var day = now.getDate().toString().padStart(2, '0');
+        var hours = now.getHours().toString().padStart(2, '0');
+        var minutes = now.getMinutes().toString().padStart(2, '0');
+        var seconds = now.getSeconds().toString().padStart(2, '0');
+        var currentTime = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+        document.getElementById('current-time').innerText = currentTime;
+    }
+    setInterval(updateTime, 1000);
+    updateTime();  // 初始化调用一次
+</script>

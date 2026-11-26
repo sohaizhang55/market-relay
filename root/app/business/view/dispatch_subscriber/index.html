@@ -1,0 +1,78 @@
+{extend name='../../admin/view/table'}
+
+{block name="button"}
+<!--{if auth("setting")}-->
+<button data-modal='{:url("setting")}' data-title="分发鉴权开关" class='layui-btn layui-btn-sm layui-btn-primary'>分发鉴权开关</button>
+<!--{/if}-->
+<!--{if auth("add")}-->
+<button data-modal='{:url("add")}' data-title="添加订阅方" class='layui-btn layui-btn-sm layui-btn-primary'>添加订阅方</button>
+<!--{/if}-->
+{/block}
+
+{block name="content"}
+<div class="layui-tab layui-tab-card">
+    <div class="layui-tab-content">
+        <div style="margin-bottom:10px;font-size:13px" class="color-desc">
+            分发鉴权：{if $authOn}<b class="color-green">已开启</b> —— WS 握手不带有效 token 直接 403{else}<b class="color-red">已关闭</b> —— 不带 token 也能连，带了 token 的会被认出并记下来源 IP{/if}。<br>
+            订阅方在 WS 握手请求头和 /inner_api/* 请求头里带 <code>X-Inner-Token: &lt;token&gt;</code>。改动最长 5 秒生效，不用重启任何进程。<br>
+            上线顺序：先给每个订阅方加一条、把 token 配过去 → 看「最后 WS 连接」都有了时间 → 再打开鉴权开关。
+        </div>
+        <fieldset>
+            <legend>条件搜索</legend>
+            <form class="layui-form layui-form-pane form-search" action="{:sysuri()}" onsubmit="return false" method="get" autocomplete="off">
+                <div class="layui-form-item layui-inline">
+                    <label class="layui-form-label">订阅方名称</label>
+                    <div class="layui-input-inline">
+                        <input name="name" value="{$get.name|default=''}" placeholder="请输入订阅方名称" class="layui-input">
+                    </div>
+                </div>
+                <div class="layui-form-item layui-inline">
+                    <button class="layui-btn layui-btn-primary"><i class="layui-icon">&#xe615;</i> 搜 索</button>
+                </div>
+            </form>
+        </fieldset>
+        <table id="DispatchSubscriberTable" data-url="{:sysuri('index')}" data-target-search="form.form-search"></table>
+    </div>
+</div>
+<script>
+    $(function () {
+        $('#DispatchSubscriberTable').layTable({
+            even: true, height: 'full',
+            cols: [[
+                { field: 'id', title: 'ID', width: 70, align: 'center' },
+                { field: 'name', title: '订阅方名称', minWidth: 150 },
+                { field: 'token_text', title: 'Token', width: 230, align: 'center', templet: '#TokenTpl' },
+                { field: 'status', title: '状态', align: 'center', width: 110, templet: '#StatusSwitchTpl' },
+                { field: 'last_ws_text', title: '最后 WS 连接', width: 240, align: 'center', templet: '<div><span class="{{d.last_ws_color}}">{{d.last_ws_text}}</span> <span class="color-desc">{{d.last_ws_time}}</span></div>' },
+                { field: 'last_api_text', title: '最后 API 请求', width: 240, align: 'center', templet: '<div><span class="{{d.last_api_color}}">{{d.last_api_text}}</span> <span class="color-desc">{{d.last_api_time}}</span></div>' },
+                { field: 'remark', title: '备注', minWidth: 150 },
+                { toolbar: '#toolbar', title: '操作面板', align: 'center', width: 230, fixed: 'right' }
+            ]]
+        });
+        layui.form.on('switch(StatusSwitch)', function (obj) {
+            $.form.load("{:url('state')}", { id: obj.value, status: obj.elem.checked ? 1 : 2 }, 'post', function (ret) {
+                if (ret.code < 1) $.msg.error(ret.info, 3, function () { $('#DispatchSubscriberTable').trigger('reload'); }); else $('#DispatchSubscriberTable').trigger('reload');
+                return false;
+            }, false);
+        });
+    });
+</script>
+<script type="text/html" id="TokenTpl">
+    <span style="font-family:monospace">{{d.token_text}}</span>
+    <a class="layui-btn layui-btn-xs layui-btn-primary margin-left-5" data-copy="{{d.token}}">复制</a>
+</script>
+<script type="text/html" id="StatusSwitchTpl">
+    <input type="checkbox" value="{{d.id}}" lay-skin="switch" lay-text="启用|停用" lay-filter="StatusSwitch" {{-d.status_on?'checked':''}}>
+</script>
+<script type="text/html" id="toolbar">
+    <!--{if auth("edit")}-->
+    <a class="layui-btn layui-btn-sm" data-modal='{:url("edit")}?id={{d.id}}' data-title="编辑订阅方">编 辑</a>
+    <!--{/if}-->
+    <!--{if auth("reset")}-->
+    <a class="layui-btn layui-btn-sm layui-btn-warm" data-confirm="重置后旧 token 立即作废，订阅方要换上新 token 才能再连上。确定重置吗？" data-action="{:url('reset')}" data-value="id#{{d.id}}">重置 token</a>
+    <!--{/if}-->
+    <!--{if auth("remove")}-->
+    <a class="layui-btn layui-btn-sm layui-btn-danger" data-confirm="删除后这个订阅方的 token 立即作废，确定要删除吗？" data-action="{:url('remove')}" data-value="id#{{d.id}}">删 除</a>
+    <!--{/if}-->
+</script>
+{/block}

@@ -1,0 +1,139 @@
+{extend name="index/index"}
+
+{block name='style'}
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<link rel="stylesheet" href="__ROOT__/static/theme/css/login.css">
+<style>
+    .otp-input {
+        width: 15%;
+        height: 55px;
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid transparent;
+        border-radius: 8px;
+        text-align: center;
+        font-size: 24px;
+        font-weight: bold;
+        color: #333;
+        transition: all 0.3s;
+        /* Override global white text fill from login.css */
+        -webkit-text-fill-color: #333 !important;
+    }
+
+    .login-container form ul li input {
+        text-indent: 0px;
+    }
+
+    .otp-input:focus {
+        border-color: #1E9FFF;
+        background: #fff;
+        box-shadow: 0 0 10px rgba(30, 159, 255, 0.3);
+        outline: none;
+    }
+
+    .back-link:hover {
+        color: #fff !important;
+        text-decoration: underline;
+    }
+
+    .login-container form ul li {
+        text-shadow: none;
+    }
+</style>
+{/block}
+
+{block name="body"}
+<div class="login-container" {$loginStyle|raw}>
+    <div class="header notselect layui-hide-xs">
+        <a href="{:url('@')}" class="title">{:sysconf('app_name')}<span>{:sysconf('app_version')}</span></a>
+    </div>
+    <form data-login-form action="{:sysuri()}" data-auto="true" method="post" class="layui-anim layui-anim-upbit"
+        autocomplete="off">
+        <h2 class="notselect">{:lang('二步验证')}</h2>
+        <ul>
+            <li class="text-center"
+                style="color:rgba(255,255,255,0.8);font-size:12px;margin-top:-10px;margin-bottom:10px">
+                {:lang('请输入 6 位动态验证码')}
+            </li>
+            <li>
+                <div class="otp-inputs" style="display:flex;justify-content:space-between;gap:5px">
+                    <input type="text" class="otp-input" maxlength="1" pattern="\d*">
+                    <input type="text" class="otp-input" maxlength="1" pattern="\d*">
+                    <input type="text" class="otp-input" maxlength="1" pattern="\d*">
+                    <input type="text" class="otp-input" maxlength="1" pattern="\d*">
+                    <input type="text" class="otp-input" maxlength="1" pattern="\d*">
+                    <input type="text" class="otp-input" maxlength="1" pattern="\d*">
+                </div>
+            </li>
+            <input type="hidden" name="code" id="real-code">
+            <li class="text-center padding-top-20">
+                <button type="submit" class="layui-btn full-width">{:lang('确认验证')}</button>
+            </li>
+            <li class="text-center">
+                <a href="{:url('admin/login/index')}" class="back-link">
+                    {:lang('返回重新登录')}</a>
+            </li>
+        </ul>
+    </form>
+    <div class="footer notselect">
+        {:sysconf('site_copy')}
+    </div>
+</div>
+{/block}
+
+{block name='script'}
+<script src="__ROOT__/static/login.js"></script>
+<script>
+    $(function () {
+        var $inputs = $('.otp-input');
+        var $realCode = $('#real-code');
+
+        $inputs.on('input', function () {
+            var index = $inputs.index(this);
+            var val = $(this).val();
+
+            // 过滤非数字
+            if (val && !/^\d$/.test(val)) {
+                $(this).val(val.replace(/\D/g, '').charAt(0));
+            }
+
+            // 自动跳到下一个
+            if ($(this).val().length >= 1 && index < 5) {
+                $inputs.eq(index + 1).focus();
+            }
+            updateRealCode();
+        });
+
+        $inputs.on('keydown', function (e) {
+            var index = $inputs.index(this);
+            if (e.which === 8) { // Backspace
+                if (!$(this).val() && index > 0) {
+                    $inputs.eq(index - 1).focus();
+                }
+            }
+        });
+
+        $inputs.on('paste', function (e) {
+            var data = e.originalEvent.clipboardData.getData('text');
+            if (/^\d{6}$/.test(data)) {
+                for (var i = 0; i < 6; i++) {
+                    $inputs.eq(i).val(data[i]);
+                }
+                $inputs.eq(5).focus();
+                updateRealCode();
+            }
+            e.preventDefault();
+        });
+
+        function updateRealCode() {
+            var code = '';
+            $inputs.each(function () {
+                code += $(this).val();
+            });
+            $realCode.val(code);
+        }
+
+        // 自动聚焦第一个
+        $inputs.eq(0).focus();
+    });
+</script>
+{/block}

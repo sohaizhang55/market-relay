@@ -1,0 +1,127 @@
+<form action="{:sysuri()}" method="post" data-auto="true" class="layui-form layui-card" data-table-id="ExchangePairTable">
+    <div class="layui-card-body padding-left-40">
+
+        <fieldset class="layui-bg-gray">
+            <legend><b class="layui-badge think-bg-violet">{if $isEdit}{$pairKey}{else}{:lang('新交易对')}{/if}</b></legend>
+
+            <div class="layui-row layui-col-space15">
+                <div class="layui-col-xs6">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('交易对代码')}</b>Symbol Code</span>
+                        {if $isEdit}
+                        <div class="layui-input layui-bg-gray">{$vo.symbol_code|default=''}</div>
+                        <span class="help-block">{:lang('创建后不能改：它和类型拼成 pair 标识，订阅方靠它对号入座。')}</span>
+                        {else}
+                        <input name="symbol_code" value='{$vo.symbol_code|default=""}' required vali-name="{:lang('交易对代码')}"
+                            placeholder="{:lang('如 btcusdt')}" class="layui-input">
+                        <span class="help-block">{:lang('小写字母和数字，订阅方在 hello 里写的就是它（btcusdt@ticker）。创建后不能改。')}</span>
+                        {/if}
+                    </label>
+                </div>
+                <div class="layui-col-xs6">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('类型')}</b>Type</span>
+                        {if $isEdit}
+                        <div class="layui-input layui-bg-gray">{$typeText}</div>
+                        {else}
+                        <select name="type" class="layui-select" required vali-name="{:lang('类型')}">
+                            {foreach $types as $k=>$v}
+                            <option value="{$k}" {if ($vo.type ?? "") eq $k}selected{/if}>{$v}</option>
+                            {/foreach}
+                        </select>
+                        <span class="help-block">{:lang('决定走哪个分发端口。创建后不能改。')}</span>
+                        {/if}
+                    </label>
+                </div>
+            </div>
+
+            <div class="layui-row layui-col-space15 margin-top-10">
+                <div class="layui-col-xs4">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('展示名称')}</b>Symbol</span>
+                        <input name="symbol" value='{$vo.symbol|default=""}' required vali-name="{:lang('展示名称')}"
+                            placeholder="{:lang('如 BTC/USDT')}" class="layui-input">
+                    </label>
+                </div>
+                <div class="layui-col-xs4">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('基础币种')}</b>Base</span>
+                        <input name="base_coin" value='{$vo.base_coin|default=""}' required vali-name="{:lang('基础币种')}"
+                            placeholder="{:lang('如 BTC')}" class="layui-input">
+                    </label>
+                </div>
+                <div class="layui-col-xs4">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('计价币种')}</b>Quote</span>
+                        <input name="quote_coin" value='{$vo.quote_coin|default="USDT"}' required vali-name="{:lang('计价币种')}"
+                            placeholder="{:lang('如 USDT')}" class="layui-input">
+                    </label>
+                </div>
+            </div>
+
+            <div class="layui-row layui-col-space15 margin-top-10">
+                <div class="layui-col-xs3">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('价格精度')}</b>Price</span>
+                        <input name="precision_price" value='{$vo.precision_price|default="2"}' required vali-name="{:lang('价格精度')}"
+                            type="number" min="0" max="10" class="layui-input">
+                    </label>
+                </div>
+                <div class="layui-col-xs3">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('数量精度')}</b>Amount</span>
+                        <input name="precision_amount" value='{$vo.precision_amount|default="4"}' required vali-name="{:lang('数量精度')}"
+                            type="number" min="0" max="10" class="layui-input">
+                    </label>
+                </div>
+                <div class="layui-col-xs3">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('排序')}</b>Sort</span>
+                        <input name="sort" value='{$vo.sort|default="0"}' type="number" class="layui-input">
+                        <span class="help-block">{:lang('越大越靠前')}</span>
+                    </label>
+                </div>
+                <div class="layui-col-xs3">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('状态')}</b>Status</span>
+                        <select name="status" class="layui-select" required vali-name="{:lang('状态')}">
+                            {foreach $statuses as $k=>$v}
+                            <option value="{$k}" {if ($vo.status ?? "") eq $k}selected{/if}>{$v}</option>
+                            {/foreach}
+                        </select>
+                    </label>
+                </div>
+            </div>
+
+            <div class="layui-row layui-col-space15 margin-top-10">
+                <div class="layui-col-xs12">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('数据源')}</b>Source</span>
+                        {if $isEdit}
+                        <div class="layui-input layui-bg-gray">{$sourceText}</div>
+                        <span class="help-block">{:lang('换源、加备源请用列表里的「数据源」按钮。')}</span>
+                        {else}
+                        <select name="source_key" class="layui-select" lay-search>
+                            <option value="">-- {:lang('不选 = 自发币，没有行情')} --</option>
+                            {foreach $sources as $key=>$text}
+                            <option value="{$key}">{$text}</option>
+                            {/foreach}
+                        </select>
+                        <span class="help-block">{:lang('只能选已有的数据源，类型要和交易对一致；会自动绑定为主源。新的数据源要先加进 database/market_data.sql 并重启对应采集器。')}</span>
+                        {/if}
+                    </label>
+                </div>
+            </div>
+
+        </fieldset>
+
+    </div>
+
+    <div class="hr-line-dashed"></div>
+    {notempty name='vo.id'}<input type='hidden' value='{$vo.id}' name='id'>{/notempty}
+
+    <div class="layui-form-item text-center">
+        <button class="layui-btn" type='submit'>{:lang('保存数据')}</button>
+        <button class="layui-btn layui-btn-danger" type='button' data-confirm="{:lang('确定要取消编辑吗？')}" data-close>{:lang('取消编辑')}</button>
+    </div>
+</form>

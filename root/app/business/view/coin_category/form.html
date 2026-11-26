@@ -1,0 +1,65 @@
+<form action="{:sysuri()}" method="post" data-auto="true" class="layui-form layui-card" data-table-id="CoinCategoryTable">
+    <div class="layui-card-body padding-left-40">
+
+        <fieldset class="layui-bg-gray">
+            <legend><b class="layui-badge think-bg-violet">{:lang('类型信息')}</b></legend>
+
+            <div class="layui-row layui-col-space15">
+                <div class="layui-col-xs6">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('类型代码')}</b>Category Code</span>
+                        <input name="code" value='{$vo.code|default=""}' required vali-name="{:lang('类型代码')}" placeholder="{:lang('请输入类型代码, 如 crypto')}" class="layui-input" {notempty name='vo.id'}readonly{/notempty}>
+                        <span class="help-block">{:lang('小写字母、数字或下划线；币种通过该代码归类，已有币种的类型不可改。')}</span>
+                    </label>
+                </div>
+                <div class="layui-col-xs6">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('类型标题')}</b>Title</span>
+                        <input name="title" value='{$vo.title|default=""}' required vali-name="{:lang('类型标题')}" placeholder="{:lang('请输入默认标题')}" class="layui-input">
+                        <span class="help-block">{:lang('多语言标题留空时使用该默认标题。')}</span>
+                    </label>
+                </div>
+            </div>
+
+            {notempty name='langList'}
+            <div class="layui-row layui-col-space15 margin-top-10">
+                {foreach $langList as $lang}
+                <div class="layui-col-xs6">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('类型标题')}</b> <span class="layui-badge">{$lang.name}</span> {$lang.value}</span>
+                        <input name="title_lang[{$lang.value}]" value="{$vo.title_lang[$lang.value]|default=''}" placeholder="{:lang('留空则使用默认标题')}" class="layui-input">
+                    </label>
+                </div>
+                {/foreach}
+            </div>
+            {/notempty}
+
+            <div class="layui-row layui-col-space15 margin-top-10">
+                <div class="layui-col-xs6">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('排序权重')}</b>Sort Weight</span>
+                        <input type="number" name="sort" value='{$vo.sort|default="0"}' required vali-name="{:lang('排序权重')}" placeholder="{:lang('请输入排序权重')}" class="layui-input">
+                        <span class="help-block">{:lang('数字越大越靠前。')}</span>
+                    </label>
+                </div>
+                <div class="layui-col-xs6">
+                    <span class="help-label"><b>{:lang('使用状态')}</b>Status</span>
+                    {foreach $statusList as $k=>$v}
+                    <input type="radio" name="status" value="{$k}" title="{$v}" {if $vo.status eq $k}checked{/if}>
+                    {/foreach}
+                    <span class="help-block">{:lang('禁用后该类型及其下币种不在前端产品列表出现，已有持仓不受影响。')}</span>
+                    <span class="help-block color-red">{:lang('注意：本开关只影响前端列表展示，不阻止下单——客户端仍可用已知交易对提交委托。要真正停止交易，请到「交易对」列表把对应交易对下架。')}</span>
+                </div>
+            </div>
+        </fieldset>
+
+    </div>
+
+    <div class="hr-line-dashed"></div>
+    {notempty name='vo.id'}<input type='hidden' value='{$vo.id}' name='id'>{/notempty}
+
+    <div class="layui-form-item text-center">
+        <button class="layui-btn" type='submit'>{:lang('保存数据')}</button>
+        <button class="layui-btn layui-btn-danger" type='button' data-confirm="{:lang('确定要取消编辑吗？')}" data-close>{:lang('取消编辑')}</button>
+    </div>
+</form>

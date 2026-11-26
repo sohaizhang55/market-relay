@@ -1,0 +1,7 @@
+# 同步伺服器时间
+# ⚠️ 必须留错误日志：整条行情链路都按时间戳判"新鲜/陈旧"（stale_seconds、
+#    收盘蜡烛的 tail_gap、心跳超时），时钟一飘，那些判定全部跟着错，
+#    而且是**朝着"看起来正常"的方向错**。ntpdate 失败只进 cron 邮件就等于没人看见。
+* * */1 * * $(which ntpdate) us.pool.ntp.org >> /dev/null 2>> /home/deploy/market-relay/logs/ntpdate_err.log && $(which hwclock) -w 2>> /home/deploy/market-relay/logs/ntpdate_err.log
+# 域名管理页面的 SSL 申请：读后台写进 Redis 的 market-relay_ssl_config，申请证书并重载 nginx（需 root）
+*/1 * * * * python /home/deploy/market-relay/tools/reset_nginx_ssl.py  >> /dev/null 2>> /home/deploy/market-relay/logs/reset_nginx_ssl_err.log

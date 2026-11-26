@@ -1,0 +1,33 @@
+{extend name="../../admin/view/main"}
+
+{block name="content"}
+<div class="layui-card layui-card-body">
+    <form class="layui-form" action="{:sysuri()}" data-auto="true" method="post" autocomplete="off">
+
+        <!-- HTTPS 域名与 SSL 状态 -->
+        <div class="layui-form-item">
+            <label class="block relative">
+                <span class="help-label color-green" style="font-weight: bold; font-size: 14px;"><b>{:lang('https域名，多个域名英文逗号分隔')}</b></span>
+                <input name="ssl_domain" value="{$ssl_config.ssl_domain|default=''}" placeholder="{:lang('请输入https域名')}" class="layui-input">
+            </label>
+            <div class="help-block">
+                {if !empty($ssl_config.ssl_domain)}
+                    {if isset($ssl_config.change_ssl_domain) && $ssl_config.change_ssl_domain eq '1'}
+                        <p style="color: red; font-weight: bold; margin-top: 5px;">等待系统生成ssl证书(等待大约1分钟后刷新查看状态)</p>
+                    {else}
+                        <p style="color: blue; font-weight: bold; margin-top: 5px;">ssl配置已执行,成功的域名有: {$ssl_config.suc_ssl_domain|default=''}</p>
+                    {/if}
+                {else}
+                    <p class="color-desc">需要开启ssl请输入ssl域名,多个域名英文逗号分隔,并且确保改域名已经解析到服务器IP。</p>
+                {/if}
+            </div>
+        </div>
+
+        <div class="hr-line-dashed margin-top-40"></div>
+        <div class="layui-form-item text-center">
+            <button class="layui-btn" type="submit">{:lang('保存配置')}</button>
+        </div>
+
+    </form>
+</div>
+{/block}

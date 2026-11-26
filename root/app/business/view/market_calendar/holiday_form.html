@@ -1,0 +1,125 @@
+<form action="{:sysuri()}" method="post" data-auto="true" class="layui-form layui-card" data-table-id="HolidayTable">
+    <div class="layui-card-body padding-left-40">
+
+        <fieldset class="layui-bg-gray">
+            <legend><b class="layui-badge think-bg-violet">{:lang('休市规则')}</b></legend>
+
+            <div class="layui-row layui-col-space15">
+                <div class="layui-col-xs6">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('交易日历')}</b>Calendar</span>
+                        <select name="calendar_code" class="layui-select" lay-search required vali-name="{:lang('交易日历')}">
+                            <option value="">-- {:lang('请选择')} --</option>
+                            {foreach $calendars as $code=>$text}
+                            <option value="{$code}" {if ($vo.calendar_code ?? "") eq $code}selected{/if}>{$text}</option>
+                            {/foreach}
+                        </select>
+                        <span class="help-block">{:lang('按作息归类，不是按上市地：AAPL 挂 NASDAQ、SPY 挂 Arca，都用 XNYS，因为三家作息相同。')}</span>
+                    </label>
+                </div>
+                <div class="layui-col-xs6">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('休市日期')}</b>Date</span>
+                        <input data-date-input name="holiday_date" value='{$vo.holiday_date|default=""}' required
+                            vali-name="{:lang('休市日期')}" placeholder="{:lang('请选择休市日期')}" class="layui-input">
+                        <span class="help-block">{:lang('交易所所在时区的自然日，不是 UTC 日期。')}</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="layui-row layui-col-space15 margin-top-10">
+                <div class="layui-col-xs12">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('休市类型')}</b>Close Type</span>
+                        <select name="close_type" class="layui-select" lay-filter="CloseType" required vali-name="{:lang('休市类型')}">
+                            {foreach $closeTypes as $k=>$v}
+                            <option value="{$k}" {if ($vo.close_type ?? "") eq $k}selected{/if}>{$v}</option>
+                            {/foreach}
+                        </select>
+                        <span class="help-block">{:lang('全日休市当天完全不开盘；时段调整用于半日市，把当天时段裁剪到下面的区间内。')}</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 只有时段调整才需要填时间。全日休市时这两个值会被 Controller 清空，
+                 留着会让后来人分不清那两个数到底生不生效 -->
+            <div class="layui-row layui-col-space15 margin-top-10" id="PartialTimeBox">
+                <div class="layui-col-xs6">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('开盘时间')}</b>Open</span>
+                        <input name="open_time" value='{$vo.open_time|default=""}' placeholder="{:lang('如 09:30，留空表示不改开盘')}" class="layui-input">
+                        <span class="help-block">{:lang('交易所本地时间，24 小时制 HH:MM，须两位补零。')}</span>
+                    </label>
+                </div>
+                <div class="layui-col-xs6">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('收盘时间')}</b>Close</span>
+                        <input name="close_time" value='{$vo.close_time|default=""}' placeholder="{:lang('如 13:00，留空表示不改收盘')}" class="layui-input">
+                        <span class="help-block">{:lang('半日市填这里。当天所有时段会被裁剪到此刻之前。')}</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="layui-row layui-col-space15 margin-top-10">
+                <div class="layui-col-xs6">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('假日名称')}</b>Title</span>
+                        <input name="title" value='{$vo.title|default=""}' placeholder="{:lang('如 Independence Day')}" class="layui-input">
+                        <span class="help-block">{:lang('便于核对来源，非必填。')}</span>
+                    </label>
+                </div>
+                <div class="layui-col-xs6">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('使用状态')}</b>Status</span>
+                        <select name="status" class="layui-select" required vali-name="{:lang('使用状态')}">
+                            {foreach $statuses as $k=>$v}
+                            <option value="{$k}" {if ($vo.status ?? "") eq $k}selected{/if}>{$v}</option>
+                            {/foreach}
+                        </select>
+                        <span class="help-block">{:lang('停用的规则不参与休市判定，用于保留记录而非删除。')}</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="layui-row layui-col-space15 margin-top-10">
+                <div class="layui-col-xs12">
+                    <label class="block relative">
+                        <span class="help-label"><b>{:lang('备注')}</b>Remark</span>
+                        <input name="remark" value='{$vo.remark|default=""}' placeholder="{:lang('选填')}" class="layui-input">
+                    </label>
+                </div>
+            </div>
+
+            <!-- 保存即标人工来源，否则下次跑导入命令会把这次修改冲掉 -->
+            <blockquote class="layui-elem-quote layui-quote-nm margin-top-15">
+                {:lang('提示：在此保存的规则会标记为「人工录入」，不会被自动导入命令覆盖，但也不再跟随上游日历更新。')}
+            </blockquote>
+
+        </fieldset>
+
+    </div>
+
+    <div class="hr-line-dashed"></div>
+    {notempty name='vo.id'}<input type='hidden' value='{$vo.id}' name='id'>{/notempty}
+
+    <div class="layui-form-item text-center">
+        <button class="layui-btn" type='submit'>{:lang('保存数据')}</button>
+        <button class="layui-btn layui-btn-danger" type='button' data-confirm="{:lang('确定要取消编辑吗？')}" data-close>{:lang('取消编辑')}</button>
+    </div>
+</form>
+
+<script>
+    $(function () {
+        // 全日休市时藏起时间输入框：留着会诱导运维去填，而填了也会被后端清空。
+        // 判据写成「不是全日休市就显示」而不是「等于时段调整才显示」——
+        // 后者在新增时段覆盖(3)时会把输入框一起藏掉，运维填不了时间、表单必然失败。
+        var fullCloseType = '{$fullCloseType}';
+        var toggleTimeBox = function (value) {
+            $('#PartialTimeBox').toggle(String(value) !== fullCloseType);
+        };
+        toggleTimeBox($('[name=close_type]').val());
+        layui.form.on('select(CloseType)', function (obj) {
+            toggleTimeBox(obj.value);
+        });
+    });
+</script>

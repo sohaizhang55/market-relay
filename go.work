@@ -1,0 +1,5 @@
+// 让 VS Code 的 Go 插件（gopls）认得 go/ 是一个模块：在 market-relay 根目录打开工作区时
+// 才有跳转、补全和类型检查。对 PHP 部分没有任何影响。
+go 1.27.0
+
+use ./go

@@ -1,0 +1,31 @@
+{extend name='../../admin/view/table'}
+
+{block name="content"}
+<div class="layui-tab layui-tab-card table-block">
+    <div class="layui-tab-content table-content">
+        {include file='exchange_pair/kline_search'}
+        <table id="PairKlineTable" data-url="{:sysuri('kline')}" data-target-search="form.form-search"></table>
+    </div>
+</div>
+
+<script>
+    $(function () {
+        $('#PairKlineTable').layTable({
+            even: true, height: 'full',
+            cols: [[
+                { field: 'id', title: 'ID', width: 80, align: 'center' },
+                { field: 'pair_id', title: '交易对ID', width: 90, align: 'center' },
+                { field: 'symbol_code', title: '交易对', minWidth: 160, templet: '<div><span class="layui-badge {{d.type_color}}" style="margin-right:5px">{{d.type_text}}</span><b>{{d.symbol_code}}</b></div>' },
+                { field: 'period_text', title: '周期', width: 100, align: 'center' },
+                { field: 'open', title: '开盘', width: 160, align: 'right' },
+                { field: 'close', title: '收盘', width: 160, align: 'right' },
+                { field: 'high', title: '最高', width: 170, align: 'right' },
+                { field: 'low', title: '最低', width: 170, align: 'right' },
+                { field: 'vol', title: '成交量', width: 170, align: 'right' },
+                { field: 'amount', title: '成交额', width: 170, align: 'right' },
+                { field: 'ts_text', title: '时间', width: 180, align: 'center' }
+            ]]
+        });
+    });
+</script>
+{/block}
